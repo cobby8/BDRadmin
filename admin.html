@@ -134,35 +134,9 @@
 </div>
 
 <script>
-// === 설정 ===
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';  // 이미 있던 앱스크립트 URL
-const APPLY_BASE  = 'https://bdrjoin.netlify.app/'; // ✅ 신청서 실제 배포 URL
-// 예) index.html 파일이 루트라면 위처럼 끝을 index.html 또는 / 로 맞춰주세요.
-
-function editUrlFor(teamId, editCode) {
-  // 항상 신청서 사이트로 이동하도록 절대 URL로 생성
-  return `${APPLY_BASE}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode)}`;
-}
-
-// 예: 행 렌더링 부분
-const url = editUrlFor(row.TeamID, row.수정코드);
-
-// 1) 새 탭 열기 버튼
-btnOpenEdit.addEventListener('click', () => {
-  window.open(url, '_blank', 'noopener');
-});
-
-// 2) 복사 버튼(있다면)
-btnCopyEdit.addEventListener('click', async () => {
-  await navigator.clipboard.writeText(url);
-  toast('수정 링크를 복사했어요');
-});
-
-// 3) <a> 링크로 넣는 경우
-a.href = url;
-a.target = '_blank';
-a.rel = 'noopener';
-  
+/* ========= 기본 상수(최초 자동 설정용) ========= */
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
+const APPLY_BASE  = 'https://bdrjoin.netlify.app/'; // 신청서 실제 배포 루트(예: /index.html가 루트라면 끝을 / 로)
 
 /* ========= 로컬 저장 ========= */
 const store = {
@@ -171,6 +145,12 @@ const store = {
   save(obj){ localStorage.setItem(this.key, JSON.stringify(obj||{})); }
 };
 const conf = store.load();
+
+/* 최초 진입 시 WEB_APP_URL이 있으면 자동 주입 */
+if (!conf.appUrl && WEB_APP_URL) {
+  conf.appUrl = WEB_APP_URL;
+  store.save(conf);
+}
 
 /* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
@@ -195,11 +175,8 @@ $('#settingsBtn').addEventListener('click', ()=>{
 function apiUrl(path, q={}){
   const base = requireAppUrl();
   let u;
-  try {
-    u = new URL(base);
-  } catch(e) {
-    throw new Error('Web App URL이 올바르지 않습니다: ' + base);
-  }
+  try { u = new URL(base); }
+  catch(e){ throw new Error('Web App URL이 올바르지 않습니다: ' + base); }
   u.searchParams.set('path', path);
   Object.entries(q).forEach(([k,v])=> u.searchParams.set(k, v));
   return u.toString();
@@ -311,7 +288,8 @@ $('#saveTourBtn').addEventListener('click', async ()=>{
       divs: textToDivs($('#tourDivs').value)
     };
     if (!payload.name) return alert('대회명을 입력하세요.');
-    const j = await postJSON('upsertTournament', payload);
+    // ✅ 백엔드 엔드포인트명 일치
+    const j = await postJSON('saveTournament', payload);
     if (!j.ok) return alert('저장 실패: ' + (j.error||'unknown'));
     await loadTournaments();
     if (j.tourId) $('#tourId').value = j.tourId;
@@ -325,7 +303,8 @@ $('#deleteTourBtn').addEventListener('click', async ()=>{
   if (!id) return alert('삭제할 대회가 선택되지 않았습니다.');
   if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
   try{
-    const j = await postJSON('removeTournament', { tourId: id });
+    // ✅ 백엔드 엔드포인트명 일치
+    const j = await postJSON('deleteTournament', { tourId: id });
     if (!j.ok) return alert('삭제 실패: ' + (j.error||'unknown'));
     clearTourForm();
     await loadTournaments();
@@ -363,13 +342,20 @@ function jerseySVG(hex, label){
     </defs>
   </svg>`;
 }
+function editUrlFor(teamId, editCode) {
+  // 항상 신청서 사이트로 이동하도록 절대 URL
+  const base = APPLY_BASE.replace(/index\.html$/,''); // 혹시 index.html 붙여놨다면 제거
+  const sep = base.endsWith('/') ? '' : '/';
+  return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`;
+}
 function rowTeam(t){
   const home = t.uniformHomeHex || t['유니폼(홈)'] || '';
   const away = t.uniformAwayHex || t['유니폼(어웨이)'] || '';
+  const editHref = editUrlFor(t.TeamID, t.수정코드);
   return `
     <tr>
       <td>${t.TeamID}</td>
-      <td>${t.tourName||''}</td>
+      <td>${t.TourName||t.tourName||''}</td>
       <td>${t.시도||''} ${t.시군구||''}</td>
       <td>
         <div><b>${t.팀명||''}</b></div>
@@ -384,7 +370,7 @@ function rowTeam(t){
       </td>
       <td>${fmtDate(t.신청일시)}</td>
       <td class="right">
-        <a class="btn" href="./index.html?edit=${encodeURIComponent(t.TeamID)}&code=${encodeURIComponent(t.수정코드||'')}" target="_blank">수정 열기</a>
+        <a class="btn" href="${editHref}" target="_blank" rel="noopener">수정 열기</a>
       </td>
     </tr>`;
 }
@@ -395,13 +381,13 @@ async function loadTeams(){
     const j = await getJSON(apiUrl('teams', tourId ? { tourId } : {}));
     let rows = j.rows || [];
 
-    // 서버가 tourId 필터를 지원하지 않는 경우 대비 → 클라에서 한 번 더 필터
+    // 서버 필터 2차 확인(구버전 대비)
     if (tourId) rows = rows.filter(r => String(r.TourID||'') === String(tourId));
 
     const q = ($('#searchText').value||'').trim().toLowerCase();
     if (q) {
       rows = rows.filter(r=>{
-        const blob = [r.TeamID,r.팀명,r.대표자이름,r.대표자연락처,r.시도,r.시군구,(r.tourName||''),(r.종별||''),(r.디비전||'')].join(' ').toLowerCase();
+        const blob = [r.TeamID,r.팀명,r.대표자이름,r.대표자연락처,r.시도,r.시군구,(r.TourName||r.tourName||''),(r.종별||''),(r.디비전||'')].join(' ').toLowerCase();
         return blob.includes(q);
       });
     }
