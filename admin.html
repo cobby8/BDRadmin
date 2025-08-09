@@ -7,17 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-
-/* 유니폼(저지) 아이콘 */
-.jerseys{display:flex;gap:12px;align-items:center}
-.jersey{width:46px;height:52px;position:relative}
-.jersey svg{width:100%;height:100%;display:block}
-.jersey .jlbl{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:10px;letter-spacing:.4px;color:#fff;
-  text-shadow:0 1px 2px rgba(0,0,0,.35);
-}
-  
   :root{ --blue:#1769ff; --bg:#f6f8fb; --card:#fff; --shadow:0 8px 32px #1769ff1a; --radius:18px; }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);font-family:'Pretendard','Apple SD Gothic Neo',sans-serif;color:#222}
@@ -40,17 +29,24 @@
   .muted{color:#6b7684;font-size:12px}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:10px}
   .flex{display:flex;gap:8px;align-items:center}
-  .right{margin-left:auto}
   .drawer{position:fixed;right:0;top:0;width:420px;max-width:100%;height:100%;background:#fff;box-shadow:-8px 0 32px #0000001a;padding:16px 16px 90px;border-left:1px solid #eef2f7;transform:translateX(100%);transition:.25s}
   .drawer.open{transform:translateX(0)}
   .drawer h2{margin:4px 0 10px;font-size:18px}
   .drawer .close{position:absolute;right:12px;top:12px}
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .swatch{width:18px;height:18px;border-radius:4px;border:1px solid #e3e8ef;display:inline-block;vertical-align:middle;margin-left:6px}
   .sticky-bottom{position:fixed;right:16px;bottom:16px;display:flex;gap:8px}
   .status-접수{background:#f1f5ff;color:#1b4fff}
   .status-확정{background:#e8fff2;color:#0a9b4e}
   .status-취소{background:#fff2f2;color:#d93025}
+
+  /* 유니폼(저지) 아이콘 */
+  .jerseys{display:flex;gap:12px;align-items:center}
+  .jersey{width:46px;height:52px;position:relative}
+  .jersey svg{width:100%;height:100%;display:block}
+  .jersey .jlbl{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:10px;letter-spacing:.4px;color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,.35);
+  }
 </style>
 </head>
 <body>
@@ -157,18 +153,17 @@
 
 <script>
   /* ====== 설정 ====== */
-  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec'; // https://script.google.com/macros/s/xxxx/exec
+  const WEB_APP_URL = '<<여기에_Apps_Script_웹앱_URL_붙여넣기>>';
 
   /* ====== 상태 ====== */
   let allTeams = [];
   let filteredTeams = [];
-  let currentTeam = null; // {TeamID, ...}
+  let currentTeam = null;
 
   /* ====== 유틸 ====== */
   const el = sel => document.querySelector(sel);
   const fmtDateTime = v => {
     if (!v) return '';
-    // 시트에서 Date로 내려올 수도/문자일 수도 → Date 시도
     const d = new Date(v);
     if (!isNaN(d.getTime())) {
       const pad = n => (n<10?'0'+n:n);
@@ -188,30 +183,29 @@
     a.click();
     URL.revokeObjectURL(a.href);
   };
-// HEX → 대비 색(라벨색) 계산
-function jerseyTextColor(hex){
-  hex = String(hex||'').replace('#','');
-  if (hex.length !== 6) return '#111';
-  const r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
-  const yiq = (r*299 + g*587 + b*114) / 1000; // 밝기
-  return yiq >= 160 ? '#111' : '#fff';
-}
 
-// 저지 SVG 생성 (단색 상의)
-function makeJersey(hex,label){
-  const fill = hex && /^#?[0-9a-fA-F]{6}$/.test(hex) ? (hex.startsWith('#')?hex:'#'+hex) : '#e9eef5';
-  const txt = jerseyTextColor(fill);
-  // 심플 탱크톱 형태
-  return `
-  <div class="jersey" title="${label} ${fill}">
-    <svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M18 6c2 5 6 9 14 9s12-4 14-9l6 6v12l8 10v32c0 3-2 5-5 5H11c-3 0-5-2-5-5V34l8-10V12l6-6z"
-            fill="${fill}" stroke="#d0d7e2" stroke-width="2" />
-      <path d="M32 15c-8 0-12-4-14-9l-6 6v7c8 3 18 4 40 0V12l-6-6c-2 5-6 9-14 9z" fill="${fill}" />
-    </svg>
-    <span class="jlbl" style="color:${txt}">${label}</span>
-  </div>`;
-}
+  // HEX 대비색
+  function jerseyTextColor(hex){
+    hex = String(hex||'').replace('#','');
+    if (hex.length !== 6) return '#111';
+    const r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
+    const yiq = (r*299 + g*587 + b*114) / 1000;
+    return yiq >= 160 ? '#111' : '#fff';
+  }
+  // 저지 SVG
+  function makeJersey(hex,label){
+    const valid = /^#?[0-9a-fA-F]{6}$/.test(String(hex||''));
+    const fill = valid ? (String(hex).startsWith('#')?hex:'#'+hex) : '#e9eef5';
+    const txt = jerseyTextColor(fill);
+    return `
+    <div class="jersey" title="${label} ${fill}">
+      <svg viewBox="0 0 64 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M18 6c2 5 6 9 14 9s12-4 14-9l6 6v12l8 10v32c0 3-2 5-5 5H11c-3 0-5-2-5-5V34l8-10V12l6-6z"
+              fill="${fill}" stroke="#d0d7e2" stroke-width="2" />
+      </svg>
+      <span class="jlbl" style="color:${txt}">${label}</span>
+    </div>`;
+  }
 
   /* ====== 데이터 로드 ====== */
   async function loadTeams() {
@@ -219,7 +213,6 @@ function makeJersey(hex,label){
     const res = await fetch(`${WEB_APP_URL}?path=teams`);
     const json = await res.json();
     if (!json.ok) { alert('팀 목록을 불러오지 못했습니다.'); return; }
-    // json.rows = [{TeamID, 시도, 시군구, 팀명, 대표자이름, 대표자연락처, 종별, 디비전, 유니폼(홈), 유니폼(어웨이), 신청일시, 상태, 비고, 수정코드}]
     allTeams = json.rows || [];
     applyFilters();
   }
@@ -249,24 +242,8 @@ function makeJersey(hex,label){
 
     filteredTeams.forEach(row => {
       const tr = document.createElement('tr');
-
-// 유니폼 칸: 저지 아이콘 2개(HOME/AWAY)
-const homeHex = row['유니폼(홈)'] || '';
-const awayHex = row['유니폼(어웨이)'] || '';
-
-tr.innerHTML = `
-  <td>${row.TeamID}</td>
-  <td>${(row['시도']||'') + ' ' + (row['시군구']||'')}</td>
-  <td>${row['팀명']||''}</td>
-  <td>${row['대표자이름']||''}</td>
-  <td>${row['대표자연락처']||''}</td>
-  <td>${row['종별']||''}</td>
-  <td>${row['디비전']||''}</td>
-  <td></td>
-  <td>${fmtDateTime(row['신청일시'])}</td>
-  <td><span class="pill status-${row['상태']||'접수'}">${row['상태']||'접수'}</span></td>
-  <td><button class="btn-ghost btn-view" data-team="${row.TeamID}">보기</button></td>
-`;
+      const homeHex = row['유니폼(홈)'] || '';
+      const awayHex = row['유니폼(어웨이)'] || '';
 
       tr.innerHTML = `
         <td>${row.TeamID}</td>
@@ -276,53 +253,34 @@ tr.innerHTML = `
         <td>${row['대표자연락처']||''}</td>
         <td>${row['종별']||''}</td>
         <td>${row['디비전']||''}</td>
-        <td></td>
+        <td><div class="jerseys">${makeJersey(homeHex,'HOME')}${makeJersey(awayHex,'AWAY')}</div></td>
         <td>${fmtDateTime(row['신청일시'])}</td>
         <td><span class="pill status-${row['상태']||'접수'}">${row['상태']||'접수'}</span></td>
         <td><button class="btn-ghost btn-view" data-team="${row.TeamID}">보기</button></td>
       `;
-
-// 저지 아이콘 삽입
-const uniCell = tr.children[7];
-uniCell.innerHTML = `<div class="jerseys">${makeJersey(homeHex,'HOME')}${makeJersey(awayHex,'AWAY')}</div>`;
-
-      // 팀 행에 임시로 홈/어웨이 컬러를 붙이는 방법:
-      // listTeams_가 현재 셀값(hex)을 돌려줄 수도/빈값일 수도 있으므로, hex가 있으면 칠하고 없으면 회색.
-      const homeHex = row['유니폼(홈)'] || '';
-      const awayHex = row['유니폼(어웨이)'] || '';
-      const hSw = uni.querySelector('[data-home]');
-      const aSw = uni.querySelector('[data-away]');
-      hSw.style.background = homeHex || '#e9eef5';
-      aSw.style.background = awayHex || '#e9eef5';
-
       tb.appendChild(tr);
     });
 
-    // row action
     tb.querySelectorAll('.btn-view').forEach(btn=>{
       btn.addEventListener('click', ()=> openTeam(btn.dataset.team));
     });
   }
 
-  /* ====== 팀 열고 선수 보기 ====== */
   async function openTeam(teamId) {
     currentTeam = (allTeams.find(t => t.TeamID === teamId) || null);
     if (!currentTeam) return;
+    document.getElementById('drawerTitle').textContent = `[${currentTeam.TeamID}] ${currentTeam['팀명']||''}`;
+    document.getElementById('drawerMeta').textContent = `${(currentTeam['시도']||'')} ${(currentTeam['시군구']||'')} · ${currentTeam['종별']||''} / ${currentTeam['디비전']||''}`;
 
-    el('#drawerTitle').textContent = `[${currentTeam.TeamID}] ${currentTeam['팀명']||''}`;
-    el('#drawerMeta').textContent = `${(currentTeam['시도']||'')} ${(currentTeam['시군구']||'')} · ${currentTeam['종별']||''} / ${currentTeam['디비전']||''}`;
-
-    // 선수 불러오기
     const res = await fetch(`${WEB_APP_URL}?path=players&teamId=${encodeURIComponent(teamId)}`);
     const json = await res.json();
     if (!json.ok) { alert('선수 목록을 불러오지 못했습니다.'); return; }
     renderPlayers(json.rows || []);
-
-    el('#drawer').classList.add('open');
+    document.getElementById('drawer').classList.add('open');
   }
 
   function renderPlayers(rows) {
-    const tb = el('#playersTable tbody');
+    const tb = document.querySelector('#playersTable tbody');
     tb.innerHTML = '';
     rows.forEach(r=>{
       const tr = document.createElement('tr');
@@ -356,13 +314,13 @@ uniCell.innerHTML = `<div class="jerseys">${makeJersey(homeHex,'HOME')}${makeJer
           if (!json.ok) throw new Error(json.error||'checkin failed');
         }catch(err){
           alert('출석 업데이트 실패: ' + err);
-          e.target.checked = !present; // 롤백
+          e.target.checked = !present;
         }
       });
     });
 
-    // CSV 내보내기 바인딩
-    el('#exportPlayersBtn').onclick = ()=>{
+    // CSV - 선수
+    document.getElementById('exportPlayersBtn').onclick = ()=>{
       const header = ['PlayerID','TeamID','선수이름','등번호','포지션','생년월일','만나이','선출여부','등록일시','출석'];
       const data = rows.map(r=>[
         r.PlayerID, r.TeamID, r['선수이름']||'', r['등번호']||'',
@@ -374,15 +332,15 @@ uniCell.innerHTML = `<div class="jerseys">${makeJersey(homeHex,'HOME')}${makeJer
   }
 
   /* ====== 이벤트 ====== */
-  el('#refreshBtn').addEventListener('click', loadTeams);
+  document.getElementById('refreshBtn').addEventListener('click', loadTeams);
   ['#q','#fCategory','#fDivision','#fStatus'].forEach(sel=>{
-    el(sel).addEventListener('input', applyFilters);
-    el(sel).addEventListener('change', applyFilters);
+    document.querySelector(sel).addEventListener('input', applyFilters);
+    document.querySelector(sel).addEventListener('change', applyFilters);
   });
-  el('#closeDrawer').addEventListener('click', ()=> el('#drawer').classList.remove('open'));
+  document.getElementById('closeDrawer').addEventListener('click', ()=> document.getElementById('drawer').classList.remove('open'));
 
-  // 팀 CSV
-  el('#exportTeamsBtn').addEventListener('click', ()=>{
+  // CSV - 팀
+  document.getElementById('exportTeamsBtn').addEventListener('click', ()=>{
     const header = ['TeamID','시도','시군구','팀명','대표자이름','대표자연락처','종별','디비전','유니폼(홈)','유니폼(어웨이)','신청일시','상태','비고'];
     const data = filteredTeams.map(t=>[
       t.TeamID, t['시도']||'', t['시군구']||'', t['팀명']||'',
@@ -398,4 +356,3 @@ uniCell.innerHTML = `<div class="jerseys">${makeJersey(homeHex,'HOME')}${makeJer
 </script>
 </body>
 </html>
-
