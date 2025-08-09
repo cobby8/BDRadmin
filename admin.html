@@ -136,7 +136,7 @@
 <script>
 /* ========= 기본 상수(최초 자동 설정용) ========= */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
-const APPLY_BASE  = 'https://bdrjoin.netlify.app/'; // 신청서 실제 배포 루트(예: /index.html가 루트라면 끝을 / 로)
+const APPLY_BASE  = 'https://bdrjoin.netlify.app/'; // 신청서 배포 루트(루트에 index.html이면 끝을 / 로)
 
 /* ========= 로컬 저장 ========= */
 const store = {
@@ -146,11 +146,8 @@ const store = {
 };
 const conf = store.load();
 
-/* 최초 진입 시 WEB_APP_URL이 있으면 자동 주입 */
-if (!conf.appUrl && WEB_APP_URL) {
-  conf.appUrl = WEB_APP_URL;
-  store.save(conf);
-}
+/* 최초 진입 시 WEB_APP_URL 자동 주입(없을 때만) */
+if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); }
 
 /* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
@@ -164,7 +161,7 @@ function requireAppUrl(){
 $('#settingsBtn').addEventListener('click', ()=>{
   const cur = (conf.appUrl || '').trim();
   const val = prompt('Apps Script Web App URL을 입력하세요:', cur);
-  if (val === null) return; // 취소
+  if (val === null) return;
   conf.appUrl = val.trim();
   store.save(conf);
   alert('저장되었습니다. 새로고침합니다.');
@@ -174,9 +171,7 @@ $('#settingsBtn').addEventListener('click', ()=>{
 /* ========= API ========= */
 function apiUrl(path, q={}){
   const base = requireAppUrl();
-  let u;
-  try { u = new URL(base); }
-  catch(e){ throw new Error('Web App URL이 올바르지 않습니다: ' + base); }
+  let u; try { u = new URL(base); } catch(e){ throw new Error('Web App URL이 올바르지 않습니다: ' + base); }
   u.searchParams.set('path', path);
   Object.entries(q).forEach(([k,v])=> u.searchParams.set(k, v));
   return u.toString();
@@ -288,8 +283,8 @@ $('#saveTourBtn').addEventListener('click', async ()=>{
       divs: textToDivs($('#tourDivs').value)
     };
     if (!payload.name) return alert('대회명을 입력하세요.');
-    // ✅ 백엔드 엔드포인트명 일치
-    const j = await postJSON('saveTournament', payload);
+    // ✅ 백엔드(doPost) 경로: upsertTournament
+    const j = await postJSON('upsertTournament', payload);
     if (!j.ok) return alert('저장 실패: ' + (j.error||'unknown'));
     await loadTournaments();
     if (j.tourId) $('#tourId').value = j.tourId;
@@ -303,8 +298,8 @@ $('#deleteTourBtn').addEventListener('click', async ()=>{
   if (!id) return alert('삭제할 대회가 선택되지 않았습니다.');
   if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
   try{
-    // ✅ 백엔드 엔드포인트명 일치
-    const j = await postJSON('deleteTournament', { tourId: id });
+    // ✅ 백엔드(doPost) 경로: removeTournament
+    const j = await postJSON('removeTournament', { tourId: id });
     if (!j.ok) return alert('삭제 실패: ' + (j.error||'unknown'));
     clearTourForm();
     await loadTournaments();
@@ -325,8 +320,10 @@ function fmtDate(v){
   const mi = String(d.getMinutes()).padStart(2,'0');
   return `${d.getFullYear()}-${mm}-${dd} ${hh}:${mi}`;
 }
+
+/* 유니폼 SVG */
 function jerseySVG(hex, label){
-  const color = (/^#[0-9A-Fa-f]{6}$/).test(hex||'') ? hex : '#e5e7eb';
+  const color = (/^#[0-9a-f]{6}$/i).test(hex||'') ? hex : '#e5e7eb';
   const text = (label||'').toUpperCase();
   return `
   <svg width="42" height="52" viewBox="0 0 42 52" xmlns="http://www.w3.org/2000/svg">
@@ -342,35 +339,68 @@ function jerseySVG(hex, label){
     </defs>
   </svg>`;
 }
+
+/* 신청서 수정 링크 */
 function editUrlFor(teamId, editCode) {
-  // 항상 신청서 사이트로 이동하도록 절대 URL
-  const base = APPLY_BASE.replace(/index\.html$/,''); // 혹시 index.html 붙여놨다면 제거
+  const base = APPLY_BASE.replace(/index\.html$/,'');
   const sep = base.endsWith('/') ? '' : '/';
   return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`;
 }
-function rowTeam(t){
-  const home = t.uniformHomeHex || t['유니폼(홈)'] || '';
-  const away = t.uniformAwayHex || t['유니폼(어웨이)'] || '';
-  const editHref = editUrlFor(t.TeamID, t.수정코드);
+
+/* ▼▼ 응답 정규화 레이어 */
+function normalizeTeamRow(r){
+  const region = [r.시도 || r.province || '', r.시군구 || r.city || ''].join(' ').trim();
+  const cat    = r.종별 || r.category || '';
+  const div    = r.디비전 || r.division || '';
+  function pickHex(primary, fallback){
+    if (typeof primary === 'string' && /^#[0-9a-f]{6}$/i.test(primary)) return primary.toLowerCase();
+    if (typeof fallback === 'string'){
+      const m = fallback.match(/#([0-9a-f]{6})/i);
+      if (m) return ('#' + m[1]).toLowerCase();
+    }
+    return '';
+  }
+  const homeHex = pickHex(r.uniformHomeHex, r['유니폼(홈)']);
+  const awayHex = pickHex(r.uniformAwayHex, r['유니폼(어웨이)']);
+
+  return {
+    teamId:       r.TeamID || r.teamId || '',
+    tourId:       (r.TourID || r.tourId || '').toString().trim(),
+    tourName:     r.tourName || r.TourName || r['대회명'] || '',
+    region,
+    teamName:     r.팀명 || r.teamName || '',
+    managerName:  r.대표자이름 || r.managerName || '',
+    managerPhone: r.대표자연락처 || r.managerPhone || '',
+    category:     cat,
+    division:     div,
+    homeHex,
+    awayHex,
+    createdAt:    r.신청일시 || r.createdAt || '',
+    editCode:     r.수정코드 || r.editCode || ''
+  };
+}
+
+/* 테이블 렌더러: 정규화된 객체만 사용 */
+function rowTeam(v){
   return `
     <tr>
-      <td>${t.TeamID}</td>
-      <td>${t.TourName||t.tourName||''}</td>
-      <td>${t.시도||''} ${t.시군구||''}</td>
+      <td>${v.teamId}</td>
+      <td>${v.tourName || '-'}</td>
+      <td>${v.region || '-'}</td>
       <td>
-        <div><b>${t.팀명||''}</b></div>
-        <div class="muted">${t.대표자이름||''} · ${t.대표자연락처||''}</div>
+        <div><b>${v.teamName || ''}</b></div>
+        <div class="muted">${v.managerName || ''} · ${v.managerPhone || ''}</div>
       </td>
-      <td>${t.종별||''} · ${t.디비전||''}</td>
+      <td>${v.category || ''} · ${v.division || ''}</td>
       <td>
         <div class="jersey">
-          ${jerseySVG(home,'HOME')}
-          ${jerseySVG(away,'AWAY')}
+          ${jerseySVG(v.homeHex,'HOME')}
+          ${jerseySVG(v.awayHex,'AWAY')}
         </div>
       </td>
-      <td>${fmtDate(t.신청일시)}</td>
+      <td>${fmtDate(v.createdAt)}</td>
       <td class="right">
-        <a class="btn" href="${editHref}" target="_blank" rel="noopener">수정 열기</a>
+        <a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a>
       </td>
     </tr>`;
 }
@@ -379,20 +409,25 @@ async function loadTeams(){
   try{
     const tourId = ($('#tourFilter').value||'').trim();
     const j = await getJSON(apiUrl('teams', tourId ? { tourId } : {}));
-    let rows = j.rows || [];
+    let rows = Array.isArray(j.rows) ? j.rows : [];
 
-    // 서버 필터 2차 확인(구버전 대비)
-    if (tourId) rows = rows.filter(r => String(r.TourID||'') === String(tourId));
+    // 서버 필터가 미적용인 경우를 대비한 2차 필터
+    if (tourId) rows = rows.filter(r => String(r.TourID||r.tourId||'').trim() === tourId);
 
+    // 검색
     const q = ($('#searchText').value||'').trim().toLowerCase();
-    if (q) {
+    if (q){
       rows = rows.filter(r=>{
-        const blob = [r.TeamID,r.팀명,r.대표자이름,r.대표자연락처,r.시도,r.시군구,(r.TourName||r.tourName||''),(r.종별||''),(r.디비전||'')].join(' ').toLowerCase();
+        const v = normalizeTeamRow(r);
+        const blob = [
+          v.teamId, v.tourName, v.region, v.teamName,
+          v.managerName, v.managerPhone, v.category, v.division
+        ].join(' ').toLowerCase();
         return blob.includes(q);
       });
     }
 
-    const html = rows.map(r=>rowTeam(r)).join('');
+    const html = rows.map(r => rowTeam(normalizeTeamRow(r))).join('');
     $('#teamsTbody').innerHTML = html || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`;
   }catch(e){
     $('#teamsTbody').innerHTML = `<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`;
@@ -412,7 +447,7 @@ $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(
 /* ========= 부트 ========= */
 (async function boot(){
   if (!conf.appUrl) {
-    alert('처음 사용이라면 ⚙️ 버튼을 눌러 Web App URL을 먼저 설정하세요.');
+    alert('처음 사용이라면 ⚙️ 버튼에서 Web App URL을 먼저 설정하세요.');
     return;
   }
   await health();
