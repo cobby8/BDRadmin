@@ -133,6 +133,23 @@
   </div>
 </div>
 
+// 관리자 페이지 상단 쯤에 한 줄 추가
+const FORM_BASE_URL = 'https://bdrjoin.netlify.app/'; 
+// ↑ 신청서가 배포된 실제 URL로 교체
+
+function buildEditUrl(teamId, editCode){
+  const q = `?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode)}`;
+  return FORM_BASE_URL + q;
+}
+
+  // 예시: “팀 명단 수정열기” 버튼 HTML
+const editUrl = buildEditUrl(row.TeamID, row.수정코드);
+html += `
+  <a class="btn btn-xs" href="${editUrl}" target="_blank" rel="noopener">
+    팀 명단 수정열기
+  </a>
+`;
+  
 <script>
 /* ========= 로컬 저장 ========= */
 const store = {
