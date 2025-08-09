@@ -133,24 +133,37 @@
   </div>
 </div>
 
-// 관리자 페이지 상단 쯤에 한 줄 추가
-const FORM_BASE_URL = 'https://bdrjoin.netlify.app/'; 
-// ↑ 신청서가 배포된 실제 URL로 교체
+<script>
+// === 설정 ===
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';  // 이미 있던 앱스크립트 URL
+const APPLY_BASE  = 'https://bdrjoin.netlify.app/'; // ✅ 신청서 실제 배포 URL
+// 예) index.html 파일이 루트라면 위처럼 끝을 index.html 또는 / 로 맞춰주세요.
 
-function buildEditUrl(teamId, editCode){
-  const q = `?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode)}`;
-  return FORM_BASE_URL + q;
+function editUrlFor(teamId, editCode) {
+  // 항상 신청서 사이트로 이동하도록 절대 URL로 생성
+  return `${APPLY_BASE}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode)}`;
 }
 
-  // 예시: “팀 명단 수정열기” 버튼 HTML
-const editUrl = buildEditUrl(row.TeamID, row.수정코드);
-html += `
-  <a class="btn btn-xs" href="${editUrl}" target="_blank" rel="noopener">
-    팀 명단 수정열기
-  </a>
-`;
+// 예: 행 렌더링 부분
+const url = editUrlFor(row.TeamID, row.수정코드);
+
+// 1) 새 탭 열기 버튼
+btnOpenEdit.addEventListener('click', () => {
+  window.open(url, '_blank', 'noopener');
+});
+
+// 2) 복사 버튼(있다면)
+btnCopyEdit.addEventListener('click', async () => {
+  await navigator.clipboard.writeText(url);
+  toast('수정 링크를 복사했어요');
+});
+
+// 3) <a> 링크로 넣는 경우
+a.href = url;
+a.target = '_blank';
+a.rel = 'noopener';
   
-<script>
+
 /* ========= 로컬 저장 ========= */
 const store = {
   key: 'BDR_ADMIN_CONF',
