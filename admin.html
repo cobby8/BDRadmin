@@ -48,13 +48,13 @@
   .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff;cursor:pointer}
   .list{display:grid;gap:10px}
   .hr{height:1px;background:#eef2f7;margin:8px 0}
-  /* 종별 드롭다운 */
+  /* 종별 드롭다운(체크박스) */
   .dd{position:relative}
   .dd-toggle{width:100%}
   .dd-panel{position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid #e6ecf5;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.12);z-index:1000;padding:10px;min-width:260px;max-width:360px}
   .dd-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-height:180px;overflow:auto;margin:6px 0}
   .dd-actions{display:flex;gap:8px;justify-content:flex-end}
-  /* 관리코드 아이콘 */
+  /* 관리코드 눈아이콘 */
   .input-icon{position:relative}
   .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:16px}
 </style>
@@ -77,7 +77,7 @@
         <label>대회 필터</label>
         <select id="tourFilter"><option value="">전체 대회</option></select>
       </div>
-      <div class="muted" style="align-self:end">※ ⚙️에서 Apps Script URL과 승인키를 확인/변경할 수 있습니다.</div>
+      <div class="muted" style="align-self:end">※ ⚙️에서 Apps Script URL을 확인/변경할 수 있습니다.</div>
     </div>
   </div>
 
@@ -108,9 +108,9 @@
           <input id="tourUrl" placeholder="안내 페이지 URL (선택)">
         </div>
 
-        <!-- 2) 종별(구분/종별) : 드롭다운(체크박스) -->
+        <!-- 2) 종별(구분/종별): 처음엔 칩만 보이고, 버튼으로 열기 -->
         <div class="section-title">종별 설정</div>
-        <div class="subtle">구분을 선택하고 <b>종별</b> 드롭다운을 열어 여러 항목을 체크 → 적용하세요. 칩을 클릭하면 제거됩니다.</div>
+        <div class="subtle">처음엔 선택된 종별만 보입니다. <b>구분/종별</b> 버튼으로 창을 열어 체크 후 적용하세요. 칩을 클릭하면 제거됩니다.</div>
         <div id="divSetList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addDivSetBtn">+ 구분/종별 추가</button>
@@ -120,7 +120,7 @@
 
         <!-- 3) 대회장소(복수) : 행안부 주소검색 팝업 -->
         <div class="section-title">대회장소</div>
-        <div class="subtle">우측 <b>+ 장소 추가</b>를 누르면 <b>행정안전부 주소검색 팝업</b>이 열립니다. 결과에서 선택하면 행이 추가됩니다.</div>
+        <div class="subtle">우측 <b>+ 장소 추가</b>를 누르면 행안부 주소검색 팝업이 열립니다. 결과에서 선택하면 행이 추가됩니다.</div>
         <div id="placeList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px;justify-content:flex-end">
           <button class="btn ghost" id="addPlaceBtn">+ 장소 추가</button>
@@ -202,7 +202,7 @@
 /* ================== 상수 / 설정 ================== */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 const APPLY_BASE  = 'https://bdrjoin.netlify.app/';
-const JUSO_KEY    = 'U01TX0FVVEgyMDI1MDkwOTIzNTcyMjExNjE2NDQ='; // 행안부 팝업 API 승인키
+const JUSO_KEY    = 'U01TX0FVVEgyMDI1MDkwOTIzNTcyMjExNjE2NDQ='; // 행안부 팝업 승인키
 
 const store = {
   key: 'BDR_ADMIN_CONF',
@@ -215,9 +215,9 @@ if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); 
 const $ = s => document.querySelector(s);
 const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
 
-/* ===== 행안부 팝업 선택 결과(리턴 페이지) 처리 가드 =====
-   팝업의 returnUrl을 이 페이지로 지정해도, 팝업 창 안에서만 실행되고
-   opener.__onJusoSelected(...) 호출 후 즉시 닫힙니다. */
+/* ====== (중요) 행안부 팝업 returnUrl 콜백 처리 ======
+   팝업에서 이 페이지로 돌아오면 쿼리스트링에 값이 담겨 오므로
+   opener.__onJusoSelected(data)를 호출한 뒤 팝업을 닫는다. */
 (function maybeJusoReturn(){
   const p = new URLSearchParams(location.search);
   if (p.get('inputYn') === 'Y' && window.opener && window.opener.__onJusoSelected){
@@ -227,7 +227,7 @@ const el = html => { const t=document.createElement('template'); t.innerHTML=htm
   }
 })();
 
-/* ================== 일반 유틸 ================== */
+/* ================== 유틸 ================== */
 function apiUrl(path, q={}){
   const base = (conf.appUrl||'').trim();
   if (!base) throw new Error('Web App URL이 설정되지 않았습니다. 우상단 ⚙️에서 설정하세요.');
@@ -247,18 +247,26 @@ async function health(){
   catch{ $('#healthDot').style.color = '#ef4444'; }
 }
 function pad(n){ return String(n).padStart(2,'0'); }
-function toLocalDT(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
-function toInputDateOnly(src){
-  if(!src) return ''; if(typeof src==='string'){ const m=src.match(/^(\d{4}-\d{2}-\d{2})/); if(m) return m[1]; }
-  const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; return '';
-}
-function toInputDT(src){
-  if(!src) return ''; if(typeof src==='string'){ const m=src.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/); if(m) return `${m[1]}T${m[2]}:${m[3]}`; }
-  const d=new Date(src); if(!isNaN(d)) return toLocalDT(d); return '';
-}
 function fmtDate(v){
   if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v);
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+/* ★★★ 시간/날짜 입력값 보존: 문자열 그대로 쓰고 보여주기 ★★★ */
+function toInputDateOnly(src){
+  if(!src) return '';
+  if(typeof src==='string'){ const m=src.match(/^(\d{4}-\d{2}-\d{2})/); if(m) return m[1]; }
+  const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  return '';
+}
+function toInputDT(src){
+  if(!src) return '';
+  if(typeof src==='string'){
+    // 앞 16자리(YYYY-MM-DDTHH:MM)만 사용 → 타임존 영향 제거
+    const m = src.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+    if (m) return `${m[1]}T${m[2]}:${m[3]}`;
+  }
+  const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return '';
 }
 function calcStatus(regStart, regEnd){
   if (!regStart || !regEnd) return '상태미정';
@@ -341,10 +349,10 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   const groupSel  = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
   groupWrap.appendChild(groupSel);
 
-  // 종별 드롭다운(체크박스)
+  // 드롭다운(체크박스) — 버튼명 "구분/종별"
   const ddWrap = el(`<div><label style="margin:0 0 6px">종별</label></div>`);
   const dd     = el(`<div class="dd"></div>`);
-  const ddBtn  = el(`<button class="btn dd-toggle" type="button">종별 선택 ▾</button>`);
+  const ddBtn  = el(`<button class="btn dd-toggle" type="button">구분/종별 ▾</button>`);
   const panel  = el(`<div class="dd-panel" style="display:none"></div>`);
   const listBox= el(`<div class="dd-row"></div>`);
   const actions= el(`<div class="dd-actions"><button class="btn" data-apply>적용</button><button class="btn" data-close>닫기</button></div>`);
@@ -388,6 +396,7 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   renderCheckboxes(); refreshChips();
   groupSel.addEventListener('change', renderCheckboxes);
 
+  // 조립
   row.appendChild(groupWrap);
   row.appendChild(ddWrap);
   row.appendChild(tags);
@@ -395,22 +404,35 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   row.appendChild(del);
 
   row.getValue = ()=>({ group: groupSel.value, divisions: values.slice() });
+  // 새 추가 시 즉시 패널 열 수 있게 메서드 제공
+  row.openPanel = ()=> openPanel();
   return row;
 }
 function getDivSets(){ return [...document.querySelectorAll('#divSetList .place-item')].map(it=>it.getValue()); }
 function setDivSets(list){ const box=$('#divSetList'); box.innerHTML=''; (list&&list.length?list:[{group:'일반부',divisions:[]}]).forEach(v=> box.appendChild(makeDivSetRow(v))); }
-$('#addDivSetBtn').addEventListener('click', ()=> $('#divSetList').appendChild(makeDivSetRow()) );
+$('#addDivSetBtn').addEventListener('click', ()=>{
+  const row = makeDivSetRow({group:'일반부', divisions:[]});
+  $('#divSetList').appendChild(row);
+  // 버튼 클릭 시 동일 선택 창을 바로 띄움
+  row.openPanel();
+});
 
 /* ================== 행안부 주소검색 팝업 ================== */
 let addrPickTargetRow = null;
+// Netlify 404 회피: 현재 파일이 .html이 아니면 루트 index.html로 콜백
+function resolveReturnUrl(){
+  let path = location.pathname;
+  if (/\.html?$/i.test(path)) return location.origin + path;
+  return location.origin + '/index.html';
+}
 function openJusoPopup(targetRow=null){
   addrPickTargetRow = targetRow;
-  const returnUrl = location.origin + location.pathname; // 이 페이지가 콜백 처리
+  const returnUrl = resolveReturnUrl();
   const url = `https://www.juso.go.kr/addrlink/addrLinkUrl.do?confmKey=${encodeURIComponent(JUSO_KEY)}&returnUrl=${encodeURIComponent(returnUrl)}&resultType=4`;
   window.open(url,'jusoPopup','width=570,height=420,scrollbars=yes,resizable=yes');
 }
 window.__onJusoSelected = function(d){
-  // d.roadAddr / d.roadAddrPart1 / d.roadAddrPart2 / d.bdNm / d.entX(경도) / d.entY(위도) …
+  // d.roadAddr / d.roadAddrPart1 / d.roadAddrPart2 / d.bdNm / d.entX(경도) / d.entY(위도)
   const v = {
     name: d.bdNm || d.roadAddr || d.roadAddrPart1 || '',
     address: d.roadAddr || [d.roadAddrPart1||'', d.roadAddrPart2||''].join(' ').trim(),
@@ -426,7 +448,6 @@ window.__onJusoSelected = function(d){
   }
   addrPickTargetRow = null;
 };
-
 function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
   const row = el(`<div class="place-item"></div>`);
   const name = el(`<div><label style="margin:0 0 6px">장소명</label><input value="${init.name||''}" placeholder="예: 서울대학교 종합체육관"></div>`);
@@ -461,14 +482,14 @@ function loadTourToForm(t){
   $('#tourName').value = t.name || '';
   $('#tourUrl').value  = t.url || '';
 
-  // 날짜/시간 안전 파싱 (리셋 방지)
+  // ★ 저장 후 값이 바뀌지 않도록 문자열 기반으로 채움
   $('#tourStart').value = toInputDateOnly(t.start);
   $('#tourEnd').value   = toInputDateOnly(t.end);
   $('#regStart').value  = toInputDT(t.regStart);
   $('#regEnd').value    = toInputDT(t.regEnd);
   updateStatusBadge();
 
-  // 종별
+  // 종별: 선택된 칩만 먼저 표시(드롭다운은 버튼으로 열기)
   let divSets = t.divSets;
   if (!Array.isArray(divSets) || !divSets.length){
     const m=t.divs||{}; divSets=Object.keys(m).map(g=>({group:g,divisions:m[g]||[]}));
@@ -493,7 +514,6 @@ function clearTourForm(){
 $('#toggleCodeBtn').addEventListener('click', ()=>{
   const i=$('#adminCode'); i.type = i.type==='password' ? 'text' : 'password';
 });
-
 async function saveTournament(){
   const name=($('#tourName').value||'').trim(); if(!name) return alert('대회명을 입력하세요.');
   const adminCode=($('#adminCode').value||'').trim(); if(!adminCode) return alert('관리코드를 입력하세요.');
