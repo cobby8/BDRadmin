@@ -7,12 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- Leaflet (지도 엔진) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-
 <style>
   :root{ --blue:#1769ff; --bg:#f6f8fb; --card:#fff; --muted:#6b7684; --red:#ef4444; --green:#16a34a }
   *{box-sizing:border-box}
@@ -51,12 +45,6 @@
   .section-title{font-weight:700;margin:16px 0 6px}
   .subtle{font-size:13px;color:#475569;margin-top:-6px}
 
-  /* 지도 모달 */
-  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:20px;z-index:9999}
-  .modal .panel{background:#fff;width:min(960px,96vw);max-height:90vh;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.18);display:flex;flex-direction:column}
-  .modal .panel header{padding:12px 16px;border-bottom:1px solid #eef2f7}
-  .modal .panel main{padding:12px 16px}
-  #map{width:100%;height:420px;border-radius:12px;border:1px solid #e6ecf5}
   .place-item{display:grid;gap:8px;grid-template-columns:1.2fr 2fr .9fr .9fr auto;align-items:center;border:1px solid #e6ecf5;border-radius:12px;padding:10px;background:#fff}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
   .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff;cursor:pointer}
@@ -82,7 +70,7 @@
         <label>대회 필터</label>
         <select id="tourFilter"><option value="">전체 대회</option></select>
       </div>
-      <div class="muted" style="align-self:end">※ 상단 ⚙️에서 Apps Script URL과 <b>VWorld API Key</b>를 설정할 수 있습니다.</div>
+      <div class="muted" style="align-self:end">※ 상단 ⚙️에서 Apps Script URL과 <b>VWorld API Key</b>를 확인/변경할 수 있습니다.</div>
     </div>
   </div>
 
@@ -115,7 +103,7 @@
 
         <!-- 2) 종별(구분/종별) : 빠른추가(드롭다운)만 유지 -->
         <div class="section-title">종별 설정</div>
-        <div class="subtle">구분을 선택하면 해당 구분의 종별 후보가 드롭다운으로 표시됩니다. 필요한 종별을 선택 후 ‘추가’ 버튼을 눌러 등록하세요.</div>
+        <div class="subtle">구분을 선택하고 종별을 드롭다운에서 골라 ‘추가’를 눌러 등록하세요.</div>
         <div id="divSetList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addDivSetBtn">+ 구분/종별 추가</button>
@@ -123,9 +111,9 @@
 
         <div class="hr"></div>
 
-        <!-- 3) 대회장소(복수) : VWorld 지도 -->
+        <!-- 3) 대회장소(복수) : VWorld 검색만 -->
         <div class="section-title">대회장소</div>
-        <div class="subtle">VWorld 타일 지도를 사용합니다. ⚙️에서 VWorld API Key를 설정하면 주소 검색도 VWorld로 동작합니다.</div>
+        <div class="subtle">주소/장소명을 입력 후 <b>검색</b>을 누르면 주소와 위도·경도가 자동으로 채워집니다. (VWorld 사용)</div>
         <div id="placeList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addPlaceBtn">+ 장소 추가</button>
@@ -195,31 +183,11 @@
   </div>
 </div>
 
-<!-- 지도 모달 -->
-<div class="modal" id="mapModal">
-  <div class="panel">
-    <header style="display:flex;align-items:center;justify-content:space-between">
-      <div style="font-weight:700">지도에서 위치 선택</div>
-      <div class="toolbar">
-        <button class="btn" id="closeMapBtn">닫기</button>
-      </div>
-    </header>
-    <main>
-      <div class="grid grid-3" style="margin-bottom:8px">
-        <input id="mapSearchText" placeholder="주소/장소명으로 검색 (VWorld)">
-        <button class="btn" id="mapSearchBtn">검색</button>
-        <div class="chips"><span class="chip" id="mapPicked" style="cursor:default">위치 미선택</span></div>
-      </div>
-      <div id="map"></div>
-      <div class="help" style="margin-top:8px">지도 배경은 VWorld 타일. VWorld API Key가 없으면 검색은 Nominatim으로 폴백합니다.</div>
-    </main>
-  </div>
-</div>
-
 <script>
 /* ========= 기본 상수 ========= */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 const APPLY_BASE  = 'https://bdrjoin.netlify.app/';
+const DEFAULT_VWORLD_KEY = '85739F39-152F-35BC-9A7F-0EB05AE0EF77'; // 요청하신 인증키 기본 적용
 
 /* ========= 로컬 저장 ========= */
 const store = {
@@ -229,6 +197,7 @@ const store = {
 };
 const conf = store.load();
 if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); }
+if (!conf.vwKey) { conf.vwKey = DEFAULT_VWORLD_KEY; store.save(conf); } // 키 기본 주입
 
 /* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
@@ -241,7 +210,7 @@ $('#settingsBtn').addEventListener('click', ()=>{
   if (valUrl === null) return;
   conf.appUrl = valUrl.trim();
 
-  const vw = prompt('VWorld API Key (검색용, 없으면 비워두세요):', conf.vwKey || '');
+  const vw = prompt('VWorld API Key (변경 시 입력, 현재 값은 자동 적용됨):', conf.vwKey || '');
   if (vw !== null) conf.vwKey = (vw||'').trim();
 
   store.save(conf);
@@ -534,76 +503,14 @@ function setDivSets(list){
 }
 $('#addDivSetBtn').addEventListener('click', ()=> $('#divSetList').appendChild(makeDivSetRow()) );
 
-/* ========= VWorld 지도 ========= */
-let map, mapMarker, mapResolve;
-
-function openMapPicker(prev){
-  $('#mapModal').style.display = 'flex';
-  setTimeout(()=>initMap(prev), 0);
-  return new Promise(res=> mapResolve = res);
-}
-function closeMapPicker(){ $('#mapModal').style.display = 'none'; mapResolve = null; }
-
-$('#closeMapBtn').addEventListener('click', ()=>{
-  if (mapResolve){
-    const p = getPickedLatLng();
-    mapResolve(p);
-  }
-  closeMapPicker();
-});
-document.getElementById('mapModal').addEventListener('click', (e)=>{
-  if (e.target.id === 'mapModal'){
-    if (mapResolve) mapResolve(getPickedLatLng());
-    closeMapPicker();
-  }
-});
-document.addEventListener('keydown', (e)=>{
-  if (e.key==='Escape' && $('#mapModal').style.display==='flex'){
-    if (mapResolve) mapResolve(getPickedLatLng());
-    closeMapPicker();
-  }
-});
-
-function setPickedText(lat, lng){
-  $('#mapPicked').textContent = (lat && lng) ? `선택됨: ${lat.toFixed(6)}, ${lng.toFixed(6)}` : '위치 미선택';
-}
-function getPickedLatLng(){
-  if (!mapMarker) return null;
-  const ll = mapMarker.getLatLng();
-  return {lat: ll.lat, lng: ll.lng};
-}
-function initMap(prev){
-  // 초기화
-  if (map){ map.remove(); map = null; mapMarker = null; }
-  map = L.map('map').setView([37.5665, 126.9780], 12);
-
-  // VWorld 타일 (Base)
-  L.tileLayer(
-    // 공개 타일 서버 (키 불필요)
-    'https://xdworld.vworld.kr/2d/Base/201612/{z}/{x}/{y}.png',
-    { maxZoom: 19, attribution: '© VWorld' }
-  ).addTo(map);
-
-  // 클릭하여 마커 지정
-  map.on('click', e=>{
-    if (mapMarker) map.removeLayer(mapMarker);
-    mapMarker = L.marker(e.latlng).addTo(map);
-    setPickedText(e.latlng.lat, e.latlng.lng);
-  });
-
-  if (prev && prev.lat && prev.lng){
-    const ll = [prev.lat, prev.lng];
-    map.setView(ll, 15);
-    mapMarker = L.marker(ll).addTo(map);
-    setPickedText(prev.lat, prev.lng);
-  }else{
-    setPickedText(null, null);
-  }
-}
+/* ========= VWorld 주소 검색 전용 ========= */
+function stripTags(s=''){ return s.replace(/<[^>]+>/g,''); }
 
 async function vworldGeocode(q){
-  if (!conf.vwKey) return null;
-  // 1) place 검색
+  const key = conf.vwKey;
+  if (!key) return null;
+
+  // 1) 장소 검색
   try{
     const u1 = new URL('https://api.vworld.kr/req/search');
     u1.searchParams.set('service','search');
@@ -614,13 +521,14 @@ async function vworldGeocode(q){
     u1.searchParams.set('query', q);
     u1.searchParams.set('type','place');
     u1.searchParams.set('format','json');
-    u1.searchParams.set('key', conf.vwKey);
+    u1.searchParams.set('key', key);
     const r1 = await fetch(u1.toString());
     const j1 = await r1.json();
-    const items = j1?.response?.result?.[0]?.items;
-    if (Array.isArray(items) && items.length && items[0].point){
-      const x = parseFloat(items[0].point.x), y = parseFloat(items[0].point.y);
-      if (isFinite(x) && isFinite(y)) return {lat:y, lng:x};
+    const it = j1?.response?.result?.[0]?.items?.[0];
+    if (it?.point?.x && it?.point?.y){
+      const lng = parseFloat(it.point.x), lat = parseFloat(it.point.y);
+      const address = it.address?.road || it.address?.parcel || it.address || stripTags(it.title) || '';
+      return { lat, lng, address: address };
     }
   }catch(e){ /* continue */ }
 
@@ -634,72 +542,65 @@ async function vworldGeocode(q){
     u2.searchParams.set('address', q);
     u2.searchParams.set('refine','true');
     u2.searchParams.set('simple','false');
-    u2.searchParams.set('format','json');
     u2.searchParams.set('type','road');
-    u2.searchParams.set('key', conf.vwKey);
+    u2.searchParams.set('format','json');
+    u2.searchParams.set('key', key);
     const r2 = await fetch(u2.toString());
     const j2 = await r2.json();
     const pt = j2?.response?.result?.point;
     const x = parseFloat(pt?.x), y = parseFloat(pt?.y);
-    if (isFinite(x) && isFinite(y)) return {lat:y, lng:x};
+    if (isFinite(x) && isFinite(y)){
+      const txt = j2?.response?.refined?.text || j2?.response?.input?.address || q;
+      return { lat:y, lng:x, address: txt };
+    }
   }catch(e){ /* continue */ }
 
   return null;
 }
 
-async function searchAddress(q){
-  if (!q) return;
-  try{
-    let loc = await vworldGeocode(q);
-    if (!loc){
-      // 폴백: Nominatim
-      const url = new URL('https://nominatim.openstreetmap.org/search');
-      url.searchParams.set('q', q);
-      url.searchParams.set('format', 'json');
-      url.searchParams.set('addressdetails', '1');
-      url.searchParams.set('limit', '1');
-      const r = await fetch(url.toString(), { headers:{'Accept-Language':'ko'} });
-      const arr = await r.json();
-      if (arr && arr[0]) loc = { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
-    }
-    if (loc){
-      map.setView([loc.lat, loc.lng], 16);
-      if (mapMarker) map.removeLayer(mapMarker);
-      mapMarker = L.marker([loc.lat, loc.lng]).addTo(map);
-      setPickedText(loc.lat, loc.lng);
-    }else{
-      alert('검색 결과가 없습니다.');
-    }
-  }catch(e){
-    alert('검색 오류: ' + e.message);
-  }
+async function nominatimGeocode(q){
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('q', q);
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('addressdetails', '1');
+  url.searchParams.set('limit', '1');
+  const r = await fetch(url.toString(), { headers:{'Accept-Language':'ko'} });
+  const arr = await r.json();
+  if (arr && arr[0]) return { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon), address: arr[0].display_name };
+  return null;
 }
-$('#mapSearchBtn').addEventListener('click', ()=> searchAddress($('#mapSearchText').value.trim()) );
 
-/* 장소 행 */
+async function searchAddressSimple(q){
+  let loc = await vworldGeocode(q);
+  if (!loc) loc = await nominatimGeocode(q);
+  return loc;
+}
+
+/* 장소 행: 지도 없이 검색만 */
 function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
   const row = el(`<div class="place-item"></div>`);
   const name = el(`<div><label style="margin:0 0 6px">장소명</label><input placeholder="예: 서울대학교 종합체육관" value="${init.name||''}"></div>`);
-  const addr = el(`<div><label style="margin:0 0 6px">주소(설명)</label><input placeholder="예: 관악구 대학동 ○○번지" value="${init.address||''}"></div>`);
+  const addr = el(`<div><label style="margin:0 0 6px">주소/검색어</label><input placeholder="예: 관악구 대학동 ○○ 또는 장소명" value="${init.address||''}"></div>`);
   const lat  = el(`<div><label style="margin:0 0 6px">위도</label><input placeholder="37.xxxxxx" value="${init.lat||''}"></div>`);
   const lng  = el(`<div><label style="margin:0 0 6px">경도</label><input placeholder="126.xxxxxx" value="${init.lng||''}"></div>`);
   const ctrl = el(`<div style="display:flex;gap:6px;align-items:flex-end">
-    <button class="btn" data-map>지도</button>
+    <button class="btn" data-search>검색</button>
     <button class="btn danger" data-del>삭제</button>
   </div>`);
-  ctrl.querySelector('[data-map]').addEventListener('click', async ()=>{
-    const prev = {
-      lat: parseFloat(lat.querySelector('input').value),
-      lng: parseFloat(lng.querySelector('input').value)
-    };
-    const picked = await openMapPicker(prev);
-    if (picked && picked.lat && picked.lng){
-      lat.querySelector('input').value = picked.lat.toFixed(6);
-      lng.querySelector('input').value = picked.lng.toFixed(6);
-    }
-    closeMapPicker();
-  });
+
+  async function doSearch(){
+    const q = addr.querySelector('input').value.trim() || name.querySelector('input').value.trim();
+    if (!q) { alert('검색어를 입력하세요.'); return; }
+    const r = await searchAddressSimple(q);
+    if (!r){ alert('검색 결과가 없습니다.'); return; }
+    addr.querySelector('input').value = r.address || addr.querySelector('input').value;
+    lat .querySelector('input').value = r.lat.toFixed(6);
+    lng .querySelector('input').value = r.lng.toFixed(6);
+  }
+
+  ctrl.querySelector('[data-search]').addEventListener('click', doSearch);
   ctrl.querySelector('[data-del]').addEventListener('click', ()=> row.remove());
+  addr.querySelector('input').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
 
   row.appendChild(name); row.appendChild(addr); row.appendChild(lat); row.appendChild(lng); row.appendChild(ctrl);
   row.getValue = ()=>({
