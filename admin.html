@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- Leaflet (지도) -->
+<!-- Leaflet (폴백 지도) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -59,7 +59,7 @@
   #map{width:100%;height:420px;border-radius:12px;border:1px solid #e6ecf5}
   .place-item{display:grid;gap:8px;grid-template-columns:1.2fr 2fr .9fr .9fr auto;align-items:center;border:1px solid #e6ecf5;border-radius:12px;padding:10px;background:#fff}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff}
+  .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff;cursor:pointer}
   .list{display:grid;gap:10px}
   .hr{height:1px;background:#eef2f7;margin:8px 0}
 </style>
@@ -82,7 +82,7 @@
         <label>대회 필터</label>
         <select id="tourFilter"><option value="">전체 대회</option></select>
       </div>
-      <div class="muted" style="align-self:end">※ 상단 ⚙️에서 Apps Script Web App URL을 설정하세요.</div>
+      <div class="muted" style="align-self:end">※ 상단 ⚙️에서 Apps Script Web App URL과 지도 설정을 할 수 있습니다.</div>
     </div>
   </div>
 
@@ -125,7 +125,7 @@
 
         <!-- 3) 대회장소(복수) -->
         <div class="section-title">대회장소</div>
-        <div class="subtle">지도에서 좌표를 선택하고 주소를 입력해 장소를 추가하세요. 여러 장소를 등록할 수 있습니다.</div>
+        <div class="subtle">⚙️에서 지도 제공자를 <b>naver</b>로 설정하고 <b>ncpClientId</b>를 입력하면 네이버 지도를 사용합니다. 키가 없으면 자동으로 Leaflet(OSM)로 동작합니다.</div>
         <div id="placeList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addPlaceBtn">+ 장소 추가</button>
@@ -133,7 +133,7 @@
 
         <div class="hr"></div>
 
-        <!-- 4) 기간 -->
+        <!-- 4) 기간 + 상태(자동) -->
         <div class="grid grid-2">
           <div>
             <label>대회기간</label>
@@ -153,9 +153,12 @@
           </div>
         </div>
 
-        <!-- 5) 상태/저장/삭제 -->
-        <div class="grid grid-2" style="margin-top:8px">
-          <input id="tourStatus" placeholder="상태(접수중, 마감 등)">
+        <div class="grid grid-2" style="margin-top:8px;align-items:end">
+          <div>
+            <label>상태(자동)</label>
+            <div id="tourStatusBadge" class="badge">상태미정</div>
+            <div class="help">접수기간에 따라 자동 표시(접수전/접수중/마감). 관리자 수동 변경 불가.</div>
+          </div>
           <div class="toolbar" style="justify-content:flex-end;gap:8px">
             <button class="btn danger" id="deleteTourBtn">삭제</button>
             <button class="btn primary" id="saveTourBtn">저장</button>
@@ -208,10 +211,10 @@
       <div class="grid grid-3" style="margin-bottom:8px">
         <input id="mapSearchText" placeholder="주소/장소명으로 검색 (예: 서울대 체육관)">
         <button class="btn" id="mapSearchBtn">검색</button>
-        <div class="chips"><span class="chip" id="mapPicked">위치 미선택</span></div>
+        <div class="chips"><span class="chip" id="mapPicked" style="cursor:default">위치 미선택</span></div>
       </div>
       <div id="map"></div>
-      <div class="help" style="margin-top:8px">지도를 클릭하면 마커가 이동합니다. 검색은 오픈스트리트맵(Nominatim)을 사용합니다.</div>
+      <div class="help" style="margin-top:8px">네이버 지도 사용 시 ncpClientId가 필요합니다. 설정값이 없으면 Leaflet(OSM)로 동작합니다.</div>
     </main>
   </div>
 </div>
@@ -229,28 +232,38 @@ const store = {
 };
 const conf = store.load();
 if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); }
+if (!conf.mapProvider) { conf.mapProvider = 'naver'; store.save(conf); } // 한국 기본: naver
 
 /* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
 const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
 
-/* ========= URL 설정 ========= */
+/* ========= 설정(프롬프트 체인) ========= */
+$('#settingsBtn').addEventListener('click', ()=>{
+  const curUrl = (conf.appUrl || '').trim();
+  const valUrl = prompt('Apps Script Web App URL을 입력하세요:', curUrl);
+  if (valUrl === null) return;
+  conf.appUrl = valUrl.trim();
+
+  const provider = prompt('지도 제공자를 입력하세요 (naver/leaflet). 기본: naver', (conf.mapProvider||'naver'));
+  if (provider !== null){
+    conf.mapProvider = (provider||'naver').trim().toLowerCase();
+  }
+  if (conf.mapProvider === 'naver'){
+    const cid = prompt('네이버 지도 ncpClientId (없으면 빈칸, 그 경우 Leaflet로 동작):', conf.naverClientId||'');
+    if (cid !== null) conf.naverClientId = cid.trim();
+  }
+  store.save(conf);
+  alert('설정이 저장되었습니다. 새로고침합니다.');
+  location.reload();
+});
+
+/* ========= API ========= */
 function requireAppUrl(){
   const appUrl = (conf.appUrl || '').trim();
   if (!appUrl) throw new Error('Web App URL이 설정되지 않았습니다. 우상단 ⚙️를 클릭해 설정하세요.');
   return appUrl;
 }
-$('#settingsBtn').addEventListener('click', ()=>{
-  const cur = (conf.appUrl || '').trim();
-  const val = prompt('Apps Script Web App URL을 입력하세요:', cur);
-  if (val === null) return;
-  conf.appUrl = val.trim();
-  store.save(conf);
-  alert('저장되었습니다. 새로고침합니다.');
-  location.reload();
-});
-
-/* ========= API ========= */
 function apiUrl(path, q={}){
   const base = requireAppUrl();
   let u; try { u = new URL(base); } catch(e){ throw new Error('Web App URL이 올바르지 않습니다: ' + base); }
@@ -283,27 +296,39 @@ async function health(){
   }
 }
 
-/* ========= 데이터(대회) ========= */
+/* ========= 대회 데이터 ========= */
 let TOURS = {};
 let TOUR_ARRAY = [];
-function divsToText(divs){
-  if (!divs) return '';
-  return Object.keys(divs).map(k=> `${k}: ${(divs[k]||[]).join(',')}`).join('\n');
+function fmtDate(v){
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd} ${hh}:${mi}`;
 }
-function textToDivs(text){
-  const out = {};
-  (text||'').replace(/\r\n/g,'\n').split('\n')
-    .map(s=>s.trim()).filter(Boolean)
-    .forEach(line=>{
-      const [cat, rest] = line.split(':');
-      const k = (cat||'').trim();
-      const v = (rest||'').trim();
-      if(!k || !v) return;
-      out[k] = v.split(',').map(s=>s.trim()).filter(Boolean);
-    });
-  return out;
+function calcStatus(regStart, regEnd){
+  if (!regStart || !regEnd) return '상태미정';
+  const now = new Date();
+  const s = new Date(regStart);
+  const e = new Date(regEnd);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return '상태미정';
+  if (now < s) return '접수전';
+  if (now > e) return '마감';
+  return '접수중';
 }
-
+function statusBadgeHtml(status){
+  const map = {
+    '접수중': {bg:'#ecfdf5', bd:'#d1fae5', fg:'#16a34a'},
+    '접수전': {bg:'#eff6ff', bd:'#dbeafe', fg:'#1769ff'},
+    '마감':   {bg:'#fef2f2', bd:'#fee2e2', fg:'#ef4444'},
+    '상태미정': {bg:'#f1f5fb', bd:'#e4ecf7', fg:'#334155'}
+  };
+  const c = map[status] || map['상태미정'];
+  return `<span class="badge" style="background:${c.bg};border-color:${c.bd};color:${c.fg}">${status}</span>`;
+}
 async function loadTournaments(){
   const j = await getJSON(apiUrl('tournaments'));
   TOURS = {}; TOUR_ARRAY = j.rows || [];
@@ -324,7 +349,8 @@ function renderTourFilter(){
 }
 function tourCard(t){
   const range = (t.start||t.end) ? `${fmtDate(t.start)} ~ ${fmtDate(t.end)}` : '일정미정';
-  return `<div class="pill" data-id="${t.TourID}"><b>${t.name}</b> · ${t.status||'상태미정'} · ${range}</div>`;
+  const stat = calcStatus(t.regStart, t.regEnd);
+  return `<div class="pill" data-id="${t.TourID}"><b>${t.name}</b> · ${stat} · ${range}</div>`;
 }
 function renderTournamentList(){
   const box = $('#tourList');
@@ -337,19 +363,7 @@ function renderTournamentList(){
   });
 }
 
-/* ========= 날짜 포맷 ========= */
-function fmtDate(v){
-  if (!v) return '';
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return String(v);
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  const hh = String(d.getHours()).padStart(2,'0');
-  const mi = String(d.getMinutes()).padStart(2,'0');
-  return `${d.getFullYear()}-${mm}-${dd} ${hh}:${mi}`;
-}
-
-/* ========= 유니폼 SVG ========= */
+/* ========= 팀 표 ========= */
 function jerseySVG(hex, label){
   const color = (/^#[0-9a-f]{6}$/i).test(hex||'') ? hex : '#e5e7eb';
   const text = (label||'').toUpperCase();
@@ -367,15 +381,6 @@ function jerseySVG(hex, label){
     </defs>
   </svg>`;
 }
-
-/* ========= 신청서 수정 링크 ========= */
-function editUrlFor(teamId, editCode) {
-  const base = APPLY_BASE.replace(/index\.html$/,'');
-  const sep = base.endsWith('/') ? '' : '/';
-  return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`;
-}
-
-/* ========= 팀 테이블 ========= */
 function normalizeTeamRow(r){
   const region = [r.시도 || r.province || '', r.시군구 || r.city || ''].join(' ').trim();
   const cat    = r.종별 || r.category || '';
@@ -422,6 +427,11 @@ function rowTeam(v){
       <td class="right"><a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a></td>
     </tr>`;
 }
+function editUrlFor(teamId, editCode) {
+  const base = APPLY_BASE.replace(/index\.html$/,'');
+  const sep = base.endsWith('/') ? '' : '/';
+  return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`;
+}
 async function loadTeams(){
   try{
     const tourId = ($('#tourFilter').value||'').trim();
@@ -450,49 +460,86 @@ async function loadTeams(){
 const DIVISION_PRESETS = {
   '일반부': ['D3','D4','D5','D6','D7'],
   '대학부': ['U1','U2','U3','UW'],
-  '여성부': ['D3','D4','D5'],       // 요구사항엔 여성부 종별 명시 X → 일반부와 유사 구성
+  '여성부': ['D3','D4','D5'],
   '유소년부': ['하모니','i1','i2','i3','i4']
 };
 function makeDivSetRow(init={ group:'일반부', divisions:[] }){
-  const groupSel = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
-  groupSel.value = init.group || '일반부';
-  const divSel = el(`<select class="divSel" multiple size="4" style="height:108px"></select>`);
-  function renderDivOptions(group){
-    divSel.innerHTML = DIVISION_PRESETS[group].map(d=>`<option value="${d}">${d}</option>`).join('');
-  }
-  renderDivOptions(groupSel.value);
-  // 선택 복원
-  (init.divisions||[]).forEach(v=>{
-    const opt = [...divSel.options].find(o=>o.value===v);
-    if (opt) opt.selected = true;
-  });
-  groupSel.addEventListener('change', ()=>{
-    renderDivOptions(groupSel.value);
-  });
-
   const row = el(`<div class="place-item"></div>`);
+
+  // 구분
   const groupWrap = el(`<div><label style="margin:0 0 6px">구분</label></div>`);
+  const groupSel = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
   groupWrap.appendChild(groupSel);
+
+  // 종별(복수선택)
   const divWrap = el(`<div><label style="margin:0 0 6px">종별(복수 선택 가능)</label></div>`);
+  const divSel = el(`<select class="divSel" multiple size="6" style="height:132px"></select>`);
   divWrap.appendChild(divSel);
+
+  // 빠른 추가(단일 드롭다운)
+  const quickWrap = el(`<div><label style="margin:0 0 6px">빠른 추가(드롭다운)</label></div>`);
+  const quickBox = el(`<div style="display:flex;gap:8px;align-items:center"></div>`);
+  const quickSel = el(`<select class="divQuickSel"></select>`);
+  const quickBtn = el(`<button class="btn">추가</button>`);
+  quickBox.appendChild(quickSel);
+  quickBox.appendChild(quickBtn);
+  quickWrap.appendChild(quickBox);
+
+  // 선택 결과 칩
   const tags = el(`<div><label style="margin:0 0 6px">선택 결과</label><div class="chips"></div></div>`);
   const chipsBox = tags.querySelector('.chips');
-  function refreshChips(){
-    const vals = [...divSel.selectedOptions].map(o=>o.value);
-    chipsBox.innerHTML = vals.length ? vals.map(v=>`<span class="chip">${v}</span>`).join('') : '<span class="muted" style="padding:6px 0">미선택</span>';
-  }
-  divSel.addEventListener('change', refreshChips); refreshChips();
 
+  // 삭제 버튼
   const del = el(`<div style="display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">
     <button class="btn danger">삭제</button>
   </div>`);
   del.querySelector('button').addEventListener('click', ()=> row.remove());
 
+  // 옵션 렌더링
+  function renderDivOptions(group){
+    const opts = DIVISION_PRESETS[group];
+    divSel.innerHTML   = opts.map(d=>`<option value="${d}">${d}</option>`).join('');
+    quickSel.innerHTML = opts.map(d=>`<option value="${d}">${d}</option>`).join('');
+  }
+  function refreshChips(){
+    const vals = [...divSel.selectedOptions].map(o=>o.value);
+    chipsBox.innerHTML = vals.length
+      ? vals.map(v=>`<span class="chip" data-v="${v}" title="클릭하여 해제">${v} ×</span>`).join('')
+      : '<span class="muted" style="padding:6px 0">미선택</span>';
+    chipsBox.querySelectorAll('.chip').forEach(c=>{
+      c.addEventListener('click', ()=>{
+        const v = c.getAttribute('data-v');
+        [...divSel.options].forEach(o=>{ if (o.value===v) o.selected=false; });
+        refreshChips();
+      });
+    });
+  }
+  function addQuick(){
+    const v = quickSel.value;
+    const opt = [...divSel.options].find(o=>o.value===v);
+    if (opt){ opt.selected = true; refreshChips(); }
+  }
+
+  groupSel.addEventListener('change', ()=>{ renderDivOptions(groupSel.value); refreshChips(); });
+  quickBtn.addEventListener('click', addQuick);
+  divSel.addEventListener('change', refreshChips);
+
+  // 초기값
+  groupSel.value = init.group || '일반부';
+  renderDivOptions(groupSel.value);
+  (init.divisions||[]).forEach(v=>{
+    const opt = [...divSel.options].find(o=>o.value===v);
+    if (opt) opt.selected = true;
+  });
+  refreshChips();
+
+  // 조립
   row.appendChild(groupWrap);
   row.appendChild(divWrap);
+  row.appendChild(quickWrap);
   row.appendChild(tags);
-  row.appendChild(el(`<div></div>`)); // grid 정렬용 빈칸
   row.appendChild(del);
+
   row.getValue = ()=>({ group: groupSel.value, divisions: [...divSel.selectedOptions].map(o=>o.value) });
   return row;
 }
@@ -507,58 +554,164 @@ function setDivSets(list){
 }
 $('#addDivSetBtn').addEventListener('click', ()=> $('#divSetList').appendChild(makeDivSetRow()) );
 
-/* ========= 장소(지도) 빌더 ========= */
-let map, mapMarker, mapResolve;
+/* ========= 장소(지도) ========= */
+let leafMap, leafMarker;
+let navMap, navMarker;
+let mapResolve = null;
+
 function openMapPicker(prev){
   $('#mapModal').style.display = 'flex';
   setTimeout(()=>initMap(prev), 0);
   return new Promise(res=> mapResolve = res);
 }
 function closeMapPicker(){ $('#mapModal').style.display = 'none'; mapResolve = null; }
-$('#closeMapBtn').addEventListener('click', ()=>{ if(mapResolve) mapResolve(null); closeMapPicker(); });
 
-function initMap(prev){
-  if (!map){
-    map = L.map('map').setView([37.5665, 126.9780], 12); // 서울
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-    map.on('click', e=>{
-      setMarker(e.latlng.lat, e.latlng.lng);
-    });
+$('#closeMapBtn').addEventListener('click', ()=>{
+  if (mapResolve){
+    const p = getPickedLatLng();
+    mapResolve(p);
   }
+  closeMapPicker();
+});
+document.getElementById('mapModal').addEventListener('click', (e)=>{
+  if (e.target.id === 'mapModal'){
+    if (mapResolve){
+      const p = getPickedLatLng();
+      mapResolve(p);
+    }
+    closeMapPicker();
+  }
+});
+document.addEventListener('keydown', (e)=>{
+  if (e.key==='Escape' && $('#mapModal').style.display==='flex'){
+    if (mapResolve){ mapResolve(getPickedLatLng()); }
+    closeMapPicker();
+  }
+});
+
+function setPickedText(lat, lng){
+  $('#mapPicked').textContent = (lat && lng) ? `선택됨: ${lat.toFixed(6)}, ${lng.toFixed(6)}` : '위치 미선택';
+}
+
+function getPickedLatLng(){
+  if (conf.mapProvider==='naver' && conf.naverClientId && navMarker){
+    const ll = navMarker.getPosition();
+    return {lat: ll.y, lng: ll.x};
+  }
+  if (leafMarker){
+    const ll = leafMarker.getLatLng();
+    return {lat: ll.lat, lng: ll.lng};
+  }
+  return null;
+}
+
+async function loadNaverScript(){
+  if (window.naver && window.naver.maps) return true;
+  if (!conf.naverClientId) return false;
+  await new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=' + encodeURIComponent(conf.naverClientId);
+    s.onload = ()=> resolve();
+    s.onerror = ()=> reject(new Error('네이버 지도 스크립트 로드 실패'));
+    document.head.appendChild(s);
+  });
+  return true;
+}
+
+async function initMap(prev){
+  const useNaver = (conf.mapProvider==='naver' && conf.naverClientId);
+  if (useNaver){
+    try{
+      await loadNaverScript();
+      initNaver(prev);
+      return;
+    }catch(e){
+      console.warn('네이버 지도 로드 실패, Leaflet로 폴백:', e);
+      initLeaflet(prev);
+    }
+  }else{
+    initLeaflet(prev);
+  }
+}
+
+function initLeaflet(prev){
+  // 해제
+  if (leafMap){ leafMap.remove(); leafMap = null; }
+  leafMap = L.map('map').setView([37.5665, 126.9780], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(leafMap);
+  leafMap.on('click', e=>{
+    if (leafMarker){ leafMap.removeLayer(leafMarker); }
+    leafMarker = L.marker(e.latlng).addTo(leafMap);
+    setPickedText(e.latlng.lat, e.latlng.lng);
+  });
   if (prev && prev.lat && prev.lng){
-    map.setView([prev.lat, prev.lng], 15);
-    setMarker(prev.lat, prev.lng);
+    const ll = [prev.lat, prev.lng];
+    leafMap.setView(ll, 15);
+    leafMarker = L.marker(ll).addTo(leafMap);
+    setPickedText(prev.lat, prev.lng);
   }else{
-    map.setView([37.5665,126.9780], 12);
-    setMarker(null,null);
-  }
-  $('#mapPicked').textContent = mapMarker ? `선택됨: ${mapMarker.getLatLng().lat.toFixed(6)}, ${mapMarker.getLatLng().lng.toFixed(6)}` : '위치 미선택';
-}
-function setMarker(lat, lng){
-  if (mapMarker){ map.removeLayer(mapMarker); mapMarker = null; }
-  if (lat && lng){
-    mapMarker = L.marker([lat, lng]).addTo(map);
-    $('#mapPicked').textContent = `선택됨: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-  }else{
-    $('#mapPicked').textContent = '위치 미선택';
+    setPickedText(null, null);
   }
 }
+
+function initNaver(prev){
+  // 해제
+  navMap = null; navMarker = null;
+  const center = (prev && prev.lat && prev.lng)
+    ? new naver.maps.LatLng(prev.lat, prev.lng)
+    : new naver.maps.LatLng(37.5665, 126.9780);
+  navMap = new naver.maps.Map('map', { center, zoom: 13 });
+  naver.maps.Event.addListener(navMap, 'click', (e)=>{
+    const ll = e.coord;
+    if (navMarker) navMarker.setMap(null);
+    navMarker = new naver.maps.Marker({ position: ll, map: navMap });
+    setPickedText(ll.y, ll.x);
+  });
+  if (prev && prev.lat && prev.lng){
+    navMarker = new naver.maps.Marker({ position: center, map: navMap });
+    navMap.setZoom(15);
+    setPickedText(prev.lat, prev.lng);
+  }else{
+    setPickedText(null, null);
+  }
+}
+
 async function searchAddress(q){
   if (!q) return;
+  const useNaver = (conf.mapProvider==='naver' && conf.naverClientId && window.naver && window.naver.maps && naver.maps.Service);
   try{
-    const url = new URL('https://nominatim.openstreetmap.org/search');
-    url.searchParams.set('q', q);
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('addressdetails', '1');
-    url.searchParams.set('limit', '1');
-    const r = await fetch(url.toString(), { headers:{'Accept-Language':'ko'} });
-    const arr = await r.json();
-    if (arr && arr[0]){
-      const lat = parseFloat(arr[0].lat), lon = parseFloat(arr[0].lon);
-      map.setView([lat, lon], 16);
-      setMarker(lat, lon);
+    if (useNaver){
+      naver.maps.Service.geocode({ query: q }, (status, res)=>{
+        if (status !== naver.maps.Service.Status.OK || !res?.v2?.addresses?.length){
+          alert('검색 결과가 없습니다.');
+          return;
+        }
+        const a = res.v2.addresses[0];
+        const lat = parseFloat(a.y), lng = parseFloat(a.x);
+        const ll = new naver.maps.LatLng(lat, lng);
+        navMap.setCenter(ll); navMap.setZoom(16);
+        if (navMarker) navMarker.setMap(null);
+        navMarker = new naver.maps.Marker({ position: ll, map: navMap });
+        setPickedText(lat, lng);
+      });
     }else{
-      alert('검색 결과가 없습니다.');
+      // Leaflet + Nominatim
+      const url = new URL('https://nominatim.openstreetmap.org/search');
+      url.searchParams.set('q', q);
+      url.searchParams.set('format', 'json');
+      url.searchParams.set('addressdetails', '1');
+      url.searchParams.set('limit', '1');
+      const r = await fetch(url.toString(), { headers:{'Accept-Language':'ko'} });
+      const arr = await r.json();
+      if (arr && arr[0]){
+        const lat = parseFloat(arr[0].lat), lon = parseFloat(arr[0].lon);
+        leafMap.setView([lat, lon], 16);
+        if (leafMarker) leafMap.removeLayer(leafMarker);
+        leafMarker = L.marker([lat, lon]).addTo(leafMap);
+        setPickedText(lat, lon);
+      }else{
+        alert('검색 결과가 없습니다.');
+      }
     }
   }catch(e){
     alert('검색 오류: ' + e.message);
@@ -578,7 +731,10 @@ function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
     <button class="btn danger" data-del>삭제</button>
   </div>`);
   ctrl.querySelector('[data-map]').addEventListener('click', async ()=>{
-    const prev = { lat: parseFloat(lat.querySelector('input').value), lng: parseFloat(lng.querySelector('input').value) };
+    const prev = {
+      lat: parseFloat(lat.querySelector('input').value),
+      lng: parseFloat(lng.querySelector('input').value)
+    };
     const picked = await openMapPicker(prev);
     if (picked && picked.lat && picked.lng){
       lat.querySelector('input').value = picked.lat.toFixed(6);
@@ -589,7 +745,6 @@ function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
   ctrl.querySelector('[data-del]').addEventListener('click', ()=> row.remove());
 
   row.appendChild(name); row.appendChild(addr); row.appendChild(lat); row.appendChild(lng); row.appendChild(ctrl);
-
   row.getValue = ()=>({
     name: name.querySelector('input').value.trim(),
     address: addr.querySelector('input').value.trim(),
@@ -602,18 +757,19 @@ function getPlaces(){ return [...document.querySelectorAll('#placeList .place-it
 function setPlaces(list){ const box=$('#placeList'); box.innerHTML=''; (list&&list.length?list:[{}]).forEach(v=> box.appendChild(makePlaceRow(v))); }
 $('#addPlaceBtn').addEventListener('click', ()=> $('#placeList').appendChild(makePlaceRow()) );
 
-/* 지도 모달에서 확정(모달 닫힐 때 마지막 마커 값 반환) */
-document.getElementById('mapModal').addEventListener('click', (e)=>{
-  if (e.target.id === 'mapModal'){ // 바깥 클릭 = 닫기
-    if (mapResolve){
-      const latlng = mapMarker ? mapMarker.getLatLng() : null;
-      mapResolve(latlng ? {lat:latlng.lat, lng:latlng.lng} : null);
-    }
-    closeMapPicker();
-  }
-});
-
 /* ========= 폼 로드/초기화 ========= */
+function toLocalDT(d){
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function updateStatusBadge(){
+  const s = $('#regStart').value || '';
+  const e = $('#regEnd').value || '';
+  const st = calcStatus(s, e);
+  $('#tourStatusBadge').innerHTML = statusBadgeHtml(st);
+}
+['regStart','regEnd'].forEach(id=> $('#'+id).addEventListener('change', updateStatusBadge));
+
 function loadTourToForm(t){
   $('#tourFormTitle').textContent = '대회 수정';
   $('#tourId').value = t.TourID || '';
@@ -621,13 +777,13 @@ function loadTourToForm(t){
   $('#tourUrl').value = t.url || '';
   $('#tourStart').valueAsDate = t.start ? new Date(t.start) : null;
   $('#tourEnd').valueAsDate   = t.end ? new Date(t.end) : null;
-  $('#tourStatus').value = t.status || '';
 
   // 접수기간(datetime-local)
   const regS = t.regStart ? new Date(t.regStart) : null;
   const regE = t.regEnd   ? new Date(t.regEnd)   : null;
   $('#regStart').value = regS ? toLocalDT(regS) : '';
   $('#regEnd').value   = regE ? toLocalDT(regE) : '';
+  updateStatusBadge();
 
   // 종별 세트 (신규 필드 우선, 없으면 기존 divs 변환)
   let divSets = t.divSets;
@@ -638,18 +794,14 @@ function loadTourToForm(t){
   setDivSets(divSets);
 
   // 장소
-  const places = Array.isArray(t.places)? t.places : [];
-  setPlaces(places);
+  setPlaces(Array.isArray(t.places)? t.places : []);
 }
 function clearTourForm(){
   $('#tourFormTitle').textContent = '대회 등록';
-  ['tourId','tourName','tourUrl','tourStart','tourEnd','tourStatus','regStart','regEnd'].forEach(id=> $('#'+id).value = '');
+  ['tourId','tourName','tourUrl','tourStart','tourEnd','regStart','regEnd'].forEach(id=> $('#'+id).value = '');
   setDivSets([{group:'일반부', divisions:[]}]);
   setPlaces([{}]);
-}
-function toLocalDT(d){
-  const pad=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  updateStatusBadge();
 }
 
 /* ========= 저장/삭제 ========= */
@@ -662,7 +814,6 @@ $('#saveTourBtn').addEventListener('click', async ()=>{
 
     // 종별 세트
     const divSets = getDivSets().map(s=>({ group:s.group, divisions:(s.divisions||[]) }));
-    // 기존 divs 형식도 함께 생성(백엔드/레거시 호환)
     const divs = {};
     divSets.forEach(s=>{
       if (!divs[s.group]) divs[s.group] = [];
@@ -672,21 +823,23 @@ $('#saveTourBtn').addEventListener('click', async ()=>{
     // 장소
     const places = getPlaces().filter(p=> p.name || p.address || (p.lat && p.lng));
 
+    const regStart = $('#regStart').value || '';
+    const regEnd   = $('#regEnd').value   || '';
+    const status   = calcStatus(regStart, regEnd); // 자동 계산
+
     const payload = {
       tourId: ($('#tourId').value || '').trim(),
       name,
       start: $('#tourStart').value || '',
       end: $('#tourEnd').value || '',
-      regStart: $('#regStart').value || '',
-      regEnd: $('#regEnd').value || '',
-      status: ($('#tourStatus').value || '').trim(),
+      regStart, regEnd,
+      status,          // ← 자동 계산된 값 전송(표시는 항상 클라이언트에서 재계산)
       url: ($('#tourUrl').value || '').trim(),
-      divSets,  // ✅ 신규 권장 필드
-      divs,     // ✅ 레거시 호환 필드
-      places    // ✅ [{name,address,lat,lng}]
+      divSets,         // 신규
+      divs,            // 레거시 호환
+      places           // [{name,address,lat,lng}]
     };
 
-    // 백엔드(doPost) 경로: upsertTournament (필드 추가 저장 필요)
     const j = await postJSON('upsertTournament', payload);
     if (!j.ok) return alert('저장 실패: ' + (j.error||'unknown'));
     await loadTournaments();
@@ -731,18 +884,8 @@ $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(
   await health();
   await loadTournaments();
   await loadTeams();
+  updateStatusBadge();
 })();
-
-/* ========= 지도 모달 결괏값 전달 보조 ========= */
-document.addEventListener('keydown', (e)=>{
-  if (e.key==='Escape' && $('#mapModal').style.display==='flex'){
-    if (mapResolve){
-      const latlng = mapMarker ? mapMarker.getLatLng() : null;
-      mapResolve(latlng ? {lat:latlng.lat, lng:latlng.lng} : null);
-    }
-    closeMapPicker();
-  }
-});
 </script>
 </body>
 </html>
