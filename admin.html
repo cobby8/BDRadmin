@@ -6,6 +6,13 @@
 <title>BDR 관리자</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- Leaflet (지도) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
 <style>
   :root{ --blue:#1769ff; --bg:#f6f8fb; --card:#fff; --muted:#6b7684; --red:#ef4444; --green:#16a34a }
   *{box-sizing:border-box}
@@ -17,11 +24,12 @@
   .row{display:grid;gap:12px}
   @media(min-width:720px){ .row-2{grid-template-columns:1.2fr 2fr} .row-3{grid-template-columns:1fr 1fr 1fr} }
   label{display:block;font-weight:600;margin:10px 0 6px}
-  input,select,textarea{width:100%;padding:12px;border:1px solid #e6ecf5;border-radius:12px;font-size:14px;outline:none}
+  input,select,textarea{width:100%;padding:12px;border:1px solid #e6ecf5;border-radius:12px;font-size:14px;outline:none;background:#fff}
   input:focus,select:focus,textarea:focus{border-color:var(--blue)}
   .btn{padding:10px 14px;border-radius:12px;border:1px solid #dfe6ee;background:#fff;cursor:pointer}
   .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
   .btn.danger{background:#fff;color:var(--red);border-color:#ffd1d1}
+  .btn.ghost{background:#fff;color:#334155;border-color:#e6ecf5}
   .btn:disabled{opacity:.5;cursor:not-allowed}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .muted{color:var(--muted);font-size:12px}
@@ -35,10 +43,25 @@
   .w-140{width:140px}
   .jersey{display:inline-flex;align-items:center;gap:6px}
   .searchbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .pill{display:inline-block;border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px}
+  .pill{display:inline-block;border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;margin:2px 0;background:#fff}
   .grid{display:grid;gap:10px}
   .grid-2{grid-template-columns:1fr 1fr}
+  .grid-3{grid-template-columns:1fr 1fr 1fr}
   .help{font-size:12px;color:#6b7280}
+  .section-title{font-weight:700;margin:16px 0 6px}
+  .subtle{font-size:13px;color:#475569;margin-top:-6px}
+
+  /* 지도 모달 */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:20px;z-index:9999}
+  .modal .panel{background:#fff;width:min(960px,96vw);max-height:90vh;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.18);display:flex;flex-direction:column}
+  .modal .panel header{padding:12px 16px;border-bottom:1px solid #eef2f7}
+  .modal .panel main{padding:12px 16px}
+  #map{width:100%;height:420px;border-radius:12px;border:1px solid #e6ecf5}
+  .place-item{display:grid;gap:8px;grid-template-columns:1.2fr 2fr .9fr .9fr auto;align-items:center;border:1px solid #e6ecf5;border-radius:12px;padding:10px;background:#fff}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff}
+  .list{display:grid;gap:10px}
+  .hr{height:1px;background:#eef2f7;margin:8px 0}
 </style>
 </head>
 <body>
@@ -73,31 +96,70 @@
     </div>
 
     <div class="row row-2">
+      <!-- 좌: 대회 목록 -->
       <div>
         <label>대회 목록</label>
         <div id="tourList" class="grid"></div>
       </div>
 
+      <!-- 우: 대회 등록/수정 -->
       <div>
         <label id="tourFormTitle">대회 등록/수정</label>
-        <div class="grid grid-2">
+
+        <!-- 1) 기본정보 -->
+        <div class="grid">
           <input id="tourId" placeholder="자동생성 (수정 시 고정)" disabled>
           <input id="tourName" placeholder="대회명">
-          <input id="tourStart" type="date" placeholder="시작일">
-          <input id="tourEnd" type="date" placeholder="종료일">
-          <input id="tourStatus" placeholder="상태(접수중, 마감 등)">
           <input id="tourUrl" placeholder="안내 페이지 URL (선택)">
         </div>
-        <label style="margin-top:12px">종별/디비전(대회별)</label>
-        <textarea id="tourDivs" rows="5" placeholder="예시) 
-일반부: D3,D4,D5
-여성부: D3,D4
-40대부: D3,D4,D5
-유소년부: 하모니,i1,i2,i3"></textarea>
-        <div class="help">한 줄에 <b>종별: 디비전,디비전</b> 형식으로 입력하세요.</div>
-        <div class="toolbar" style="margin-top:10px">
-          <button class="btn primary" id="saveTourBtn">저장</button>
-          <button class="btn danger" id="deleteTourBtn">삭제</button>
+
+        <!-- 2) 종별(구분/종별) 빌더 -->
+        <div class="section-title">종별 설정</div>
+        <div class="subtle">구분을 선택하면 해당 구분의 종별 후보가 자동으로 표시됩니다. 한 대회에 복수의 구분/종별 세트를 추가할 수 있습니다.</div>
+        <div id="divSetList" class="list" style="margin-top:8px"></div>
+        <div class="toolbar" style="margin-top:6px">
+          <button class="btn ghost" id="addDivSetBtn">+ 구분/종별 추가</button>
+        </div>
+
+        <div class="hr"></div>
+
+        <!-- 3) 대회장소(복수) -->
+        <div class="section-title">대회장소</div>
+        <div class="subtle">지도에서 좌표를 선택하고 주소를 입력해 장소를 추가하세요. 여러 장소를 등록할 수 있습니다.</div>
+        <div id="placeList" class="list" style="margin-top:8px"></div>
+        <div class="toolbar" style="margin-top:6px">
+          <button class="btn ghost" id="addPlaceBtn">+ 장소 추가</button>
+        </div>
+
+        <div class="hr"></div>
+
+        <!-- 4) 기간 -->
+        <div class="grid grid-2">
+          <div>
+            <label>대회기간</label>
+            <div class="grid grid-2">
+              <input id="tourStart" type="date" placeholder="시작일">
+              <input id="tourEnd" type="date" placeholder="종료일">
+            </div>
+            <div class="help">대회가 열리는 날짜 구간입니다.</div>
+          </div>
+          <div>
+            <label>접수기간</label>
+            <div class="grid grid-2">
+              <input id="regStart" type="datetime-local" placeholder="접수 시작">
+              <input id="regEnd" type="datetime-local" placeholder="접수 종료">
+            </div>
+            <div class="help">참가신청 접수 가능 시간입니다. (날짜+시간)</div>
+          </div>
+        </div>
+
+        <!-- 5) 상태/저장/삭제 -->
+        <div class="grid grid-2" style="margin-top:8px">
+          <input id="tourStatus" placeholder="상태(접수중, 마감 등)">
+          <div class="toolbar" style="justify-content:flex-end;gap:8px">
+            <button class="btn danger" id="deleteTourBtn">삭제</button>
+            <button class="btn primary" id="saveTourBtn">저장</button>
+          </div>
         </div>
       </div>
     </div>
@@ -133,10 +195,31 @@
   </div>
 </div>
 
+<!-- 지도 모달 -->
+<div class="modal" id="mapModal">
+  <div class="panel">
+    <header style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-weight:700">지도에서 위치 선택</div>
+      <div class="toolbar">
+        <button class="btn" id="closeMapBtn">닫기</button>
+      </div>
+    </header>
+    <main>
+      <div class="grid grid-3" style="margin-bottom:8px">
+        <input id="mapSearchText" placeholder="주소/장소명으로 검색 (예: 서울대 체육관)">
+        <button class="btn" id="mapSearchBtn">검색</button>
+        <div class="chips"><span class="chip" id="mapPicked">위치 미선택</span></div>
+      </div>
+      <div id="map"></div>
+      <div class="help" style="margin-top:8px">지도를 클릭하면 마커가 이동합니다. 검색은 오픈스트리트맵(Nominatim)을 사용합니다.</div>
+    </main>
+  </div>
+</div>
+
 <script>
-/* ========= 기본 상수(최초 자동 설정용) ========= */
+/* ========= 기본 상수 ========= */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
-const APPLY_BASE  = 'https://bdrjoin.netlify.app/'; // 신청서 배포 루트(루트에 index.html이면 끝을 / 로)
+const APPLY_BASE  = 'https://bdrjoin.netlify.app/';
 
 /* ========= 로컬 저장 ========= */
 const store = {
@@ -145,14 +228,13 @@ const store = {
   save(obj){ localStorage.setItem(this.key, JSON.stringify(obj||{})); }
 };
 const conf = store.load();
-
-/* 최초 진입 시 WEB_APP_URL 자동 주입(없을 때만) */
 if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); }
 
 /* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
+const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
 
-/* ========= URL 설정(숨김) ========= */
+/* ========= URL 설정 ========= */
 function requireAppUrl(){
   const appUrl = (conf.appUrl || '').trim();
   if (!appUrl) throw new Error('Web App URL이 설정되지 않았습니다. 우상단 ⚙️를 클릭해 설정하세요.');
@@ -201,10 +283,9 @@ async function health(){
   }
 }
 
-/* ========= 대회 ========== */
+/* ========= 데이터(대회) ========= */
 let TOURS = {};
 let TOUR_ARRAY = [];
-
 function divsToText(divs){
   if (!divs) return '';
   return Object.keys(divs).map(k=> `${k}: ${(divs[k]||[]).join(',')}`).join('\n');
@@ -255,61 +336,8 @@ function renderTournamentList(){
     });
   });
 }
-function loadTourToForm(t){
-  $('#tourFormTitle').textContent = '대회 수정';
-  $('#tourId').value = t.TourID || '';
-  $('#tourName').value = t.name || '';
-  $('#tourStart').valueAsDate = t.start ? new Date(t.start) : null;
-  $('#tourEnd').valueAsDate   = t.end ? new Date(t.end) : null;
-  $('#tourStatus').value = t.status || '';
-  $('#tourUrl').value = t.url || '';
-  $('#tourDivs').value = divsToText(t.divs || {});
-}
-function clearTourForm(){
-  $('#tourFormTitle').textContent = '대회 등록';
-  ['tourId','tourName','tourStart','tourEnd','tourStatus','tourUrl','tourDivs'].forEach(id=> $('#'+id).value = '');
-}
 
-$('#newTourBtn').addEventListener('click', clearTourForm);
-$('#saveTourBtn').addEventListener('click', async ()=>{
-  try{
-    const payload = {
-      tourId: ($('#tourId').value || '').trim(),
-      name: ($('#tourName').value || '').trim(),
-      start: $('#tourStart').value || '',
-      end: $('#tourEnd').value || '',
-      status: $('#tourStatus').value || '',
-      url: $('#tourUrl').value || '',
-      divs: textToDivs($('#tourDivs').value)
-    };
-    if (!payload.name) return alert('대회명을 입력하세요.');
-    // ✅ 백엔드(doPost) 경로: upsertTournament
-    const j = await postJSON('upsertTournament', payload);
-    if (!j.ok) return alert('저장 실패: ' + (j.error||'unknown'));
-    await loadTournaments();
-    if (j.tourId) $('#tourId').value = j.tourId;
-    alert('저장되었습니다.');
-  }catch(e){
-    alert('저장 중 오류: ' + e.message);
-  }
-});
-$('#deleteTourBtn').addEventListener('click', async ()=>{
-  const id = ($('#tourId').value || '').trim();
-  if (!id) return alert('삭제할 대회가 선택되지 않았습니다.');
-  if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
-  try{
-    // ✅ 백엔드(doPost) 경로: removeTournament
-    const j = await postJSON('removeTournament', { tourId: id });
-    if (!j.ok) return alert('삭제 실패: ' + (j.error||'unknown'));
-    clearTourForm();
-    await loadTournaments();
-    alert('삭제되었습니다.');
-  }catch(e){
-    alert('삭제 중 오류: ' + e.message);
-  }
-});
-
-/* ========= 팀 목록 ========= */
+/* ========= 날짜 포맷 ========= */
 function fmtDate(v){
   if (!v) return '';
   const d = new Date(v);
@@ -321,7 +349,7 @@ function fmtDate(v){
   return `${d.getFullYear()}-${mm}-${dd} ${hh}:${mi}`;
 }
 
-/* 유니폼 SVG */
+/* ========= 유니폼 SVG ========= */
 function jerseySVG(hex, label){
   const color = (/^#[0-9a-f]{6}$/i).test(hex||'') ? hex : '#e5e7eb';
   const text = (label||'').toUpperCase();
@@ -340,14 +368,14 @@ function jerseySVG(hex, label){
   </svg>`;
 }
 
-/* 신청서 수정 링크 */
+/* ========= 신청서 수정 링크 ========= */
 function editUrlFor(teamId, editCode) {
   const base = APPLY_BASE.replace(/index\.html$/,'');
   const sep = base.endsWith('/') ? '' : '/';
   return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`;
 }
 
-/* ▼▼ 응답 정규화 레이어 */
+/* ========= 팀 테이블 ========= */
 function normalizeTeamRow(r){
   const region = [r.시도 || r.province || '', r.시군구 || r.city || ''].join(' ').trim();
   const cat    = r.종별 || r.category || '';
@@ -362,7 +390,6 @@ function normalizeTeamRow(r){
   }
   const homeHex = pickHex(r.uniformHomeHex, r['유니폼(홈)']);
   const awayHex = pickHex(r.uniformAwayHex, r['유니폼(어웨이)']);
-
   return {
     teamId:       r.TeamID || r.teamId || '',
     tourId:       (r.TourID || r.tourId || '').toString().trim(),
@@ -379,8 +406,6 @@ function normalizeTeamRow(r){
     editCode:     r.수정코드 || r.editCode || ''
   };
 }
-
-/* 테이블 렌더러: 정규화된 객체만 사용 */
 function rowTeam(v){
   return `
     <tr>
@@ -392,29 +417,17 @@ function rowTeam(v){
         <div class="muted">${v.managerName || ''} · ${v.managerPhone || ''}</div>
       </td>
       <td>${v.category || ''} · ${v.division || ''}</td>
-      <td>
-        <div class="jersey">
-          ${jerseySVG(v.homeHex,'HOME')}
-          ${jerseySVG(v.awayHex,'AWAY')}
-        </div>
-      </td>
+      <td><div class="jersey">${jerseySVG(v.homeHex,'HOME')}${jerseySVG(v.awayHex,'AWAY')}</div></td>
       <td>${fmtDate(v.createdAt)}</td>
-      <td class="right">
-        <a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a>
-      </td>
+      <td class="right"><a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a></td>
     </tr>`;
 }
-
 async function loadTeams(){
   try{
     const tourId = ($('#tourFilter').value||'').trim();
     const j = await getJSON(apiUrl('teams', tourId ? { tourId } : {}));
     let rows = Array.isArray(j.rows) ? j.rows : [];
-
-    // 서버 필터가 미적용인 경우를 대비한 2차 필터
     if (tourId) rows = rows.filter(r => String(r.TourID||r.tourId||'').trim() === tourId);
-
-    // 검색
     const q = ($('#searchText').value||'').trim().toLowerCase();
     if (q){
       rows = rows.filter(r=>{
@@ -426,13 +439,278 @@ async function loadTeams(){
         return blob.includes(q);
       });
     }
-
     const html = rows.map(r => rowTeam(normalizeTeamRow(r))).join('');
     $('#teamsTbody').innerHTML = html || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`;
   }catch(e){
     $('#teamsTbody').innerHTML = `<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`;
   }
 }
+
+/* ========= 종별(구분/종별) 빌더 ========= */
+const DIVISION_PRESETS = {
+  '일반부': ['D3','D4','D5','D6','D7'],
+  '대학부': ['U1','U2','U3','UW'],
+  '여성부': ['D3','D4','D5'],       // 요구사항엔 여성부 종별 명시 X → 일반부와 유사 구성
+  '유소년부': ['하모니','i1','i2','i3','i4']
+};
+function makeDivSetRow(init={ group:'일반부', divisions:[] }){
+  const groupSel = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
+  groupSel.value = init.group || '일반부';
+  const divSel = el(`<select class="divSel" multiple size="4" style="height:108px"></select>`);
+  function renderDivOptions(group){
+    divSel.innerHTML = DIVISION_PRESETS[group].map(d=>`<option value="${d}">${d}</option>`).join('');
+  }
+  renderDivOptions(groupSel.value);
+  // 선택 복원
+  (init.divisions||[]).forEach(v=>{
+    const opt = [...divSel.options].find(o=>o.value===v);
+    if (opt) opt.selected = true;
+  });
+  groupSel.addEventListener('change', ()=>{
+    renderDivOptions(groupSel.value);
+  });
+
+  const row = el(`<div class="place-item"></div>`);
+  const groupWrap = el(`<div><label style="margin:0 0 6px">구분</label></div>`);
+  groupWrap.appendChild(groupSel);
+  const divWrap = el(`<div><label style="margin:0 0 6px">종별(복수 선택 가능)</label></div>`);
+  divWrap.appendChild(divSel);
+  const tags = el(`<div><label style="margin:0 0 6px">선택 결과</label><div class="chips"></div></div>`);
+  const chipsBox = tags.querySelector('.chips');
+  function refreshChips(){
+    const vals = [...divSel.selectedOptions].map(o=>o.value);
+    chipsBox.innerHTML = vals.length ? vals.map(v=>`<span class="chip">${v}</span>`).join('') : '<span class="muted" style="padding:6px 0">미선택</span>';
+  }
+  divSel.addEventListener('change', refreshChips); refreshChips();
+
+  const del = el(`<div style="display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">
+    <button class="btn danger">삭제</button>
+  </div>`);
+  del.querySelector('button').addEventListener('click', ()=> row.remove());
+
+  row.appendChild(groupWrap);
+  row.appendChild(divWrap);
+  row.appendChild(tags);
+  row.appendChild(el(`<div></div>`)); // grid 정렬용 빈칸
+  row.appendChild(del);
+  row.getValue = ()=>({ group: groupSel.value, divisions: [...divSel.selectedOptions].map(o=>o.value) });
+  return row;
+}
+function getDivSets(){
+  return [...document.querySelectorAll('#divSetList .place-item')].map(it => it.getValue());
+}
+function setDivSets(list){
+  const box = $('#divSetList'); box.innerHTML = '';
+  (list && list.length ? list : [{group:'일반부', divisions:[]}]).forEach(v=>{
+    box.appendChild(makeDivSetRow(v));
+  });
+}
+$('#addDivSetBtn').addEventListener('click', ()=> $('#divSetList').appendChild(makeDivSetRow()) );
+
+/* ========= 장소(지도) 빌더 ========= */
+let map, mapMarker, mapResolve;
+function openMapPicker(prev){
+  $('#mapModal').style.display = 'flex';
+  setTimeout(()=>initMap(prev), 0);
+  return new Promise(res=> mapResolve = res);
+}
+function closeMapPicker(){ $('#mapModal').style.display = 'none'; mapResolve = null; }
+$('#closeMapBtn').addEventListener('click', ()=>{ if(mapResolve) mapResolve(null); closeMapPicker(); });
+
+function initMap(prev){
+  if (!map){
+    map = L.map('map').setView([37.5665, 126.9780], 12); // 서울
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    map.on('click', e=>{
+      setMarker(e.latlng.lat, e.latlng.lng);
+    });
+  }
+  if (prev && prev.lat && prev.lng){
+    map.setView([prev.lat, prev.lng], 15);
+    setMarker(prev.lat, prev.lng);
+  }else{
+    map.setView([37.5665,126.9780], 12);
+    setMarker(null,null);
+  }
+  $('#mapPicked').textContent = mapMarker ? `선택됨: ${mapMarker.getLatLng().lat.toFixed(6)}, ${mapMarker.getLatLng().lng.toFixed(6)}` : '위치 미선택';
+}
+function setMarker(lat, lng){
+  if (mapMarker){ map.removeLayer(mapMarker); mapMarker = null; }
+  if (lat && lng){
+    mapMarker = L.marker([lat, lng]).addTo(map);
+    $('#mapPicked').textContent = `선택됨: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  }else{
+    $('#mapPicked').textContent = '위치 미선택';
+  }
+}
+async function searchAddress(q){
+  if (!q) return;
+  try{
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('q', q);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('addressdetails', '1');
+    url.searchParams.set('limit', '1');
+    const r = await fetch(url.toString(), { headers:{'Accept-Language':'ko'} });
+    const arr = await r.json();
+    if (arr && arr[0]){
+      const lat = parseFloat(arr[0].lat), lon = parseFloat(arr[0].lon);
+      map.setView([lat, lon], 16);
+      setMarker(lat, lon);
+    }else{
+      alert('검색 결과가 없습니다.');
+    }
+  }catch(e){
+    alert('검색 오류: ' + e.message);
+  }
+}
+$('#mapSearchBtn').addEventListener('click', ()=> searchAddress($('#mapSearchText').value.trim()) );
+
+/* 장소 행 */
+function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
+  const row = el(`<div class="place-item"></div>`);
+  const name = el(`<div><label style="margin:0 0 6px">장소명</label><input placeholder="예: 서울대학교 종합체육관" value="${init.name||''}"></div>`);
+  const addr = el(`<div><label style="margin:0 0 6px">주소(설명)</label><input placeholder="예: 관악구 대학동 ○○번지" value="${init.address||''}"></div>`);
+  const lat  = el(`<div><label style="margin:0 0 6px">위도</label><input placeholder="37.xxxxxx" value="${init.lat||''}"></div>`);
+  const lng  = el(`<div><label style="margin:0 0 6px">경도</label><input placeholder="126.xxxxxx" value="${init.lng||''}"></div>`);
+  const ctrl = el(`<div style="display:flex;gap:6px;align-items:flex-end">
+    <button class="btn" data-map>지도</button>
+    <button class="btn danger" data-del>삭제</button>
+  </div>`);
+  ctrl.querySelector('[data-map]').addEventListener('click', async ()=>{
+    const prev = { lat: parseFloat(lat.querySelector('input').value), lng: parseFloat(lng.querySelector('input').value) };
+    const picked = await openMapPicker(prev);
+    if (picked && picked.lat && picked.lng){
+      lat.querySelector('input').value = picked.lat.toFixed(6);
+      lng.querySelector('input').value = picked.lng.toFixed(6);
+    }
+    closeMapPicker();
+  });
+  ctrl.querySelector('[data-del]').addEventListener('click', ()=> row.remove());
+
+  row.appendChild(name); row.appendChild(addr); row.appendChild(lat); row.appendChild(lng); row.appendChild(ctrl);
+
+  row.getValue = ()=>({
+    name: name.querySelector('input').value.trim(),
+    address: addr.querySelector('input').value.trim(),
+    lat: parseFloat(lat.querySelector('input').value),
+    lng: parseFloat(lng.querySelector('input').value)
+  });
+  return row;
+}
+function getPlaces(){ return [...document.querySelectorAll('#placeList .place-item')].map(it => it.getValue()); }
+function setPlaces(list){ const box=$('#placeList'); box.innerHTML=''; (list&&list.length?list:[{}]).forEach(v=> box.appendChild(makePlaceRow(v))); }
+$('#addPlaceBtn').addEventListener('click', ()=> $('#placeList').appendChild(makePlaceRow()) );
+
+/* 지도 모달에서 확정(모달 닫힐 때 마지막 마커 값 반환) */
+document.getElementById('mapModal').addEventListener('click', (e)=>{
+  if (e.target.id === 'mapModal'){ // 바깥 클릭 = 닫기
+    if (mapResolve){
+      const latlng = mapMarker ? mapMarker.getLatLng() : null;
+      mapResolve(latlng ? {lat:latlng.lat, lng:latlng.lng} : null);
+    }
+    closeMapPicker();
+  }
+});
+
+/* ========= 폼 로드/초기화 ========= */
+function loadTourToForm(t){
+  $('#tourFormTitle').textContent = '대회 수정';
+  $('#tourId').value = t.TourID || '';
+  $('#tourName').value = t.name || '';
+  $('#tourUrl').value = t.url || '';
+  $('#tourStart').valueAsDate = t.start ? new Date(t.start) : null;
+  $('#tourEnd').valueAsDate   = t.end ? new Date(t.end) : null;
+  $('#tourStatus').value = t.status || '';
+
+  // 접수기간(datetime-local)
+  const regS = t.regStart ? new Date(t.regStart) : null;
+  const regE = t.regEnd   ? new Date(t.regEnd)   : null;
+  $('#regStart').value = regS ? toLocalDT(regS) : '';
+  $('#regEnd').value   = regE ? toLocalDT(regE) : '';
+
+  // 종별 세트 (신규 필드 우선, 없으면 기존 divs 변환)
+  let divSets = t.divSets;
+  if (!Array.isArray(divSets) || !divSets.length){
+    const m = t.divs || {};
+    divSets = Object.keys(m).map(g=>({ group:g, divisions: m[g]||[] }));
+  }
+  setDivSets(divSets);
+
+  // 장소
+  const places = Array.isArray(t.places)? t.places : [];
+  setPlaces(places);
+}
+function clearTourForm(){
+  $('#tourFormTitle').textContent = '대회 등록';
+  ['tourId','tourName','tourUrl','tourStart','tourEnd','tourStatus','regStart','regEnd'].forEach(id=> $('#'+id).value = '');
+  setDivSets([{group:'일반부', divisions:[]}]);
+  setPlaces([{}]);
+}
+function toLocalDT(d){
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/* ========= 저장/삭제 ========= */
+$('#newTourBtn').addEventListener('click', clearTourForm);
+
+$('#saveTourBtn').addEventListener('click', async ()=>{
+  try{
+    const name = ($('#tourName').value||'').trim();
+    if (!name) return alert('대회명을 입력하세요.');
+
+    // 종별 세트
+    const divSets = getDivSets().map(s=>({ group:s.group, divisions:(s.divisions||[]) }));
+    // 기존 divs 형식도 함께 생성(백엔드/레거시 호환)
+    const divs = {};
+    divSets.forEach(s=>{
+      if (!divs[s.group]) divs[s.group] = [];
+      (s.divisions||[]).forEach(d=>{ if (!divs[s.group].includes(d)) divs[s.group].push(d); });
+    });
+
+    // 장소
+    const places = getPlaces().filter(p=> p.name || p.address || (p.lat && p.lng));
+
+    const payload = {
+      tourId: ($('#tourId').value || '').trim(),
+      name,
+      start: $('#tourStart').value || '',
+      end: $('#tourEnd').value || '',
+      regStart: $('#regStart').value || '',
+      regEnd: $('#regEnd').value || '',
+      status: ($('#tourStatus').value || '').trim(),
+      url: ($('#tourUrl').value || '').trim(),
+      divSets,  // ✅ 신규 권장 필드
+      divs,     // ✅ 레거시 호환 필드
+      places    // ✅ [{name,address,lat,lng}]
+    };
+
+    // 백엔드(doPost) 경로: upsertTournament (필드 추가 저장 필요)
+    const j = await postJSON('upsertTournament', payload);
+    if (!j.ok) return alert('저장 실패: ' + (j.error||'unknown'));
+    await loadTournaments();
+    if (j.tourId) $('#tourId').value = j.tourId;
+    alert('저장되었습니다.');
+  }catch(e){
+    alert('저장 중 오류: ' + e.message);
+  }
+});
+
+$('#deleteTourBtn').addEventListener('click', async ()=>{
+  const id = ($('#tourId').value || '').trim();
+  if (!id) return alert('삭제할 대회가 선택되지 않았습니다.');
+  if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+  try{
+    const j = await postJSON('removeTournament', { tourId: id });
+    if (!j.ok) return alert('삭제 실패: ' + (j.error||'unknown'));
+    clearTourForm();
+    await loadTournaments();
+    alert('삭제되었습니다.');
+  }catch(e){
+    alert('삭제 중 오류: ' + e.message);
+  }
+});
 
 /* ========= 이벤트 ========= */
 $('#reloadBtn').addEventListener('click', async ()=>{
@@ -454,6 +732,17 @@ $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(
   await loadTournaments();
   await loadTeams();
 })();
+
+/* ========= 지도 모달 결괏값 전달 보조 ========= */
+document.addEventListener('keydown', (e)=>{
+  if (e.key==='Escape' && $('#mapModal').style.display==='flex'){
+    if (mapResolve){
+      const latlng = mapMarker ? mapMarker.getLatLng() : null;
+      mapResolve(latlng ? {lat:latlng.lat, lng:latlng.lng} : null);
+    }
+    closeMapPicker();
+  }
+});
 </script>
 </body>
 </html>
