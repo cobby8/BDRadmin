@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- Leaflet (폴백 지도) -->
+<!-- Leaflet (지도 엔진) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -82,7 +82,7 @@
         <label>대회 필터</label>
         <select id="tourFilter"><option value="">전체 대회</option></select>
       </div>
-      <div class="muted" style="align-self:end">※ 상단 ⚙️에서 Apps Script Web App URL과 지도 설정을 할 수 있습니다.</div>
+      <div class="muted" style="align-self:end">※ 상단 ⚙️에서 Apps Script URL과 <b>VWorld API Key</b>를 설정할 수 있습니다.</div>
     </div>
   </div>
 
@@ -113,9 +113,9 @@
           <input id="tourUrl" placeholder="안내 페이지 URL (선택)">
         </div>
 
-        <!-- 2) 종별(구분/종별) 빌더 -->
+        <!-- 2) 종별(구분/종별) : 빠른추가(드롭다운)만 유지 -->
         <div class="section-title">종별 설정</div>
-        <div class="subtle">구분을 선택하면 해당 구분의 종별 후보가 자동으로 표시됩니다. 한 대회에 복수의 구분/종별 세트를 추가할 수 있습니다.</div>
+        <div class="subtle">구분을 선택하면 해당 구분의 종별 후보가 드롭다운으로 표시됩니다. 필요한 종별을 선택 후 ‘추가’ 버튼을 눌러 등록하세요.</div>
         <div id="divSetList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addDivSetBtn">+ 구분/종별 추가</button>
@@ -123,9 +123,9 @@
 
         <div class="hr"></div>
 
-        <!-- 3) 대회장소(복수) -->
+        <!-- 3) 대회장소(복수) : VWorld 지도 -->
         <div class="section-title">대회장소</div>
-        <div class="subtle">⚙️에서 지도 제공자를 <b>naver</b>로 설정하고 <b>ncpClientId</b>를 입력하면 네이버 지도를 사용합니다. 키가 없으면 자동으로 Leaflet(OSM)로 동작합니다.</div>
+        <div class="subtle">VWorld 타일 지도를 사용합니다. ⚙️에서 VWorld API Key를 설정하면 주소 검색도 VWorld로 동작합니다.</div>
         <div id="placeList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addPlaceBtn">+ 장소 추가</button>
@@ -133,27 +133,24 @@
 
         <div class="hr"></div>
 
-        <!-- 4) 기간 + 상태(자동) -->
+        <!-- 4-1) 대회기간 (윗줄 단독 섹션) -->
+        <div class="section-title">대회기간</div>
         <div class="grid grid-2">
-          <div>
-            <label>대회기간</label>
-            <div class="grid grid-2">
-              <input id="tourStart" type="date" placeholder="시작일">
-              <input id="tourEnd" type="date" placeholder="종료일">
-            </div>
-            <div class="help">대회가 열리는 날짜 구간입니다.</div>
-          </div>
-          <div>
-            <label>접수기간</label>
-            <div class="grid grid-2">
-              <input id="regStart" type="datetime-local" placeholder="접수 시작">
-              <input id="regEnd" type="datetime-local" placeholder="접수 종료">
-            </div>
-            <div class="help">참가신청 접수 가능 시간입니다. (날짜+시간)</div>
-          </div>
+          <input id="tourStart" type="date" placeholder="시작일">
+          <input id="tourEnd" type="date" placeholder="종료일">
         </div>
+        <div class="help" style="margin-top:4px">대회가 열리는 날짜 구간입니다.</div>
 
-        <div class="grid grid-2" style="margin-top:8px;align-items:end">
+        <!-- 4-2) 접수기간 (아랫줄 단독 섹션) -->
+        <div class="section-title" style="margin-top:14px">접수기간</div>
+        <div class="grid grid-2">
+          <input id="regStart" type="datetime-local" placeholder="접수 시작">
+          <input id="regEnd" type="datetime-local" placeholder="접수 종료">
+        </div>
+        <div class="help" style="margin-top:4px">참가신청 접수 가능 시간입니다. (날짜+시간)</div>
+
+        <!-- 상태(자동) + 저장 -->
+        <div class="grid grid-2" style="margin-top:12px;align-items:end">
           <div>
             <label>상태(자동)</label>
             <div id="tourStatusBadge" class="badge">상태미정</div>
@@ -209,12 +206,12 @@
     </header>
     <main>
       <div class="grid grid-3" style="margin-bottom:8px">
-        <input id="mapSearchText" placeholder="주소/장소명으로 검색 (예: 서울대 체육관)">
+        <input id="mapSearchText" placeholder="주소/장소명으로 검색 (VWorld)">
         <button class="btn" id="mapSearchBtn">검색</button>
         <div class="chips"><span class="chip" id="mapPicked" style="cursor:default">위치 미선택</span></div>
       </div>
       <div id="map"></div>
-      <div class="help" style="margin-top:8px">네이버 지도 사용 시 ncpClientId가 필요합니다. 설정값이 없으면 Leaflet(OSM)로 동작합니다.</div>
+      <div class="help" style="margin-top:8px">지도 배경은 VWorld 타일. VWorld API Key가 없으면 검색은 Nominatim으로 폴백합니다.</div>
     </main>
   </div>
 </div>
@@ -232,27 +229,21 @@ const store = {
 };
 const conf = store.load();
 if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); }
-if (!conf.mapProvider) { conf.mapProvider = 'naver'; store.save(conf); } // 한국 기본: naver
 
 /* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
 const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
 
-/* ========= 설정(프롬프트 체인) ========= */
+/* ========= 설정 ========= */
 $('#settingsBtn').addEventListener('click', ()=>{
   const curUrl = (conf.appUrl || '').trim();
   const valUrl = prompt('Apps Script Web App URL을 입력하세요:', curUrl);
   if (valUrl === null) return;
   conf.appUrl = valUrl.trim();
 
-  const provider = prompt('지도 제공자를 입력하세요 (naver/leaflet). 기본: naver', (conf.mapProvider||'naver'));
-  if (provider !== null){
-    conf.mapProvider = (provider||'naver').trim().toLowerCase();
-  }
-  if (conf.mapProvider === 'naver'){
-    const cid = prompt('네이버 지도 ncpClientId (없으면 빈칸, 그 경우 Leaflet로 동작):', conf.naverClientId||'');
-    if (cid !== null) conf.naverClientId = cid.trim();
-  }
+  const vw = prompt('VWorld API Key (검색용, 없으면 비워두세요):', conf.vwKey || '');
+  if (vw !== null) conf.vwKey = (vw||'').trim();
+
   store.save(conf);
   alert('설정이 저장되었습니다. 새로고침합니다.');
   location.reload();
@@ -456,7 +447,7 @@ async function loadTeams(){
   }
 }
 
-/* ========= 종별(구분/종별) 빌더 ========= */
+/* ========= 종별(구분/종별) - 드롭다운만 ========= */
 const DIVISION_PRESETS = {
   '일반부': ['D3','D4','D5','D6','D7'],
   '대학부': ['U1','U2','U3','UW'],
@@ -471,12 +462,7 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   const groupSel = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
   groupWrap.appendChild(groupSel);
 
-  // 종별(복수선택)
-  const divWrap = el(`<div><label style="margin:0 0 6px">종별(복수 선택 가능)</label></div>`);
-  const divSel = el(`<select class="divSel" multiple size="6" style="height:132px"></select>`);
-  divWrap.appendChild(divSel);
-
-  // 빠른 추가(단일 드롭다운)
+  // 빠른 추가(드롭다운)
   const quickWrap = el(`<div><label style="margin:0 0 6px">빠른 추가(드롭다운)</label></div>`);
   const quickBox = el(`<div style="display:flex;gap:8px;align-items:center"></div>`);
   const quickSel = el(`<select class="divQuickSel"></select>`);
@@ -495,52 +481,46 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   </div>`);
   del.querySelector('button').addEventListener('click', ()=> row.remove());
 
-  // 옵션 렌더링
-  function renderDivOptions(group){
-    const opts = DIVISION_PRESETS[group];
-    divSel.innerHTML   = opts.map(d=>`<option value="${d}">${d}</option>`).join('');
-    quickSel.innerHTML = opts.map(d=>`<option value="${d}">${d}</option>`).join('');
+  // 내부 상태
+  let values = Array.from(init.divisions || []);
+
+  function renderOptions(group){
+    quickSel.innerHTML = DIVISION_PRESETS[group].map(d=>`<option value="${d}">${d}</option>`).join('');
   }
   function refreshChips(){
-    const vals = [...divSel.selectedOptions].map(o=>o.value);
-    chipsBox.innerHTML = vals.length
-      ? vals.map(v=>`<span class="chip" data-v="${v}" title="클릭하여 해제">${v} ×</span>`).join('')
+    chipsBox.innerHTML = values.length
+      ? values.map(v=>`<span class="chip" data-v="${v}" title="클릭하여 제거">${v} ×</span>`).join('')
       : '<span class="muted" style="padding:6px 0">미선택</span>';
     chipsBox.querySelectorAll('.chip').forEach(c=>{
       c.addEventListener('click', ()=>{
         const v = c.getAttribute('data-v');
-        [...divSel.options].forEach(o=>{ if (o.value===v) o.selected=false; });
+        values = values.filter(x=>x!==v);
         refreshChips();
       });
     });
   }
   function addQuick(){
     const v = quickSel.value;
-    const opt = [...divSel.options].find(o=>o.value===v);
-    if (opt){ opt.selected = true; refreshChips(); }
+    if (!values.includes(v)) values.push(v);
+    refreshChips();
   }
 
-  groupSel.addEventListener('change', ()=>{ renderDivOptions(groupSel.value); refreshChips(); });
+  groupSel.addEventListener('change', ()=> renderOptions(groupSel.value));
   quickBtn.addEventListener('click', addQuick);
-  divSel.addEventListener('change', refreshChips);
 
-  // 초기값
+  // 초기화
   groupSel.value = init.group || '일반부';
-  renderDivOptions(groupSel.value);
-  (init.divisions||[]).forEach(v=>{
-    const opt = [...divSel.options].find(o=>o.value===v);
-    if (opt) opt.selected = true;
-  });
+  renderOptions(groupSel.value);
   refreshChips();
 
   // 조립
   row.appendChild(groupWrap);
-  row.appendChild(divWrap);
   row.appendChild(quickWrap);
   row.appendChild(tags);
+  row.appendChild(el('<div></div>'));
   row.appendChild(del);
 
-  row.getValue = ()=>({ group: groupSel.value, divisions: [...divSel.selectedOptions].map(o=>o.value) });
+  row.getValue = ()=>({ group: groupSel.value, divisions: values.slice() });
   return row;
 }
 function getDivSets(){
@@ -554,10 +534,8 @@ function setDivSets(list){
 }
 $('#addDivSetBtn').addEventListener('click', ()=> $('#divSetList').appendChild(makeDivSetRow()) );
 
-/* ========= 장소(지도) ========= */
-let leafMap, leafMarker;
-let navMap, navMarker;
-let mapResolve = null;
+/* ========= VWorld 지도 ========= */
+let map, mapMarker, mapResolve;
 
 function openMapPicker(prev){
   $('#mapModal').style.display = 'flex';
@@ -575,16 +553,13 @@ $('#closeMapBtn').addEventListener('click', ()=>{
 });
 document.getElementById('mapModal').addEventListener('click', (e)=>{
   if (e.target.id === 'mapModal'){
-    if (mapResolve){
-      const p = getPickedLatLng();
-      mapResolve(p);
-    }
+    if (mapResolve) mapResolve(getPickedLatLng());
     closeMapPicker();
   }
 });
 document.addEventListener('keydown', (e)=>{
   if (e.key==='Escape' && $('#mapModal').style.display==='flex'){
-    if (mapResolve){ mapResolve(getPickedLatLng()); }
+    if (mapResolve) mapResolve(getPickedLatLng());
     closeMapPicker();
   }
 });
@@ -592,110 +567,92 @@ document.addEventListener('keydown', (e)=>{
 function setPickedText(lat, lng){
   $('#mapPicked').textContent = (lat && lng) ? `선택됨: ${lat.toFixed(6)}, ${lng.toFixed(6)}` : '위치 미선택';
 }
-
 function getPickedLatLng(){
-  if (conf.mapProvider==='naver' && conf.naverClientId && navMarker){
-    const ll = navMarker.getPosition();
-    return {lat: ll.y, lng: ll.x};
-  }
-  if (leafMarker){
-    const ll = leafMarker.getLatLng();
-    return {lat: ll.lat, lng: ll.lng};
-  }
-  return null;
+  if (!mapMarker) return null;
+  const ll = mapMarker.getLatLng();
+  return {lat: ll.lat, lng: ll.lng};
 }
+function initMap(prev){
+  // 초기화
+  if (map){ map.remove(); map = null; mapMarker = null; }
+  map = L.map('map').setView([37.5665, 126.9780], 12);
 
-async function loadNaverScript(){
-  if (window.naver && window.naver.maps) return true;
-  if (!conf.naverClientId) return false;
-  await new Promise((resolve, reject)=>{
-    const s = document.createElement('script');
-    s.src = 'https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=' + encodeURIComponent(conf.naverClientId);
-    s.onload = ()=> resolve();
-    s.onerror = ()=> reject(new Error('네이버 지도 스크립트 로드 실패'));
-    document.head.appendChild(s);
-  });
-  return true;
-}
+  // VWorld 타일 (Base)
+  L.tileLayer(
+    // 공개 타일 서버 (키 불필요)
+    'https://xdworld.vworld.kr/2d/Base/201612/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '© VWorld' }
+  ).addTo(map);
 
-async function initMap(prev){
-  const useNaver = (conf.mapProvider==='naver' && conf.naverClientId);
-  if (useNaver){
-    try{
-      await loadNaverScript();
-      initNaver(prev);
-      return;
-    }catch(e){
-      console.warn('네이버 지도 로드 실패, Leaflet로 폴백:', e);
-      initLeaflet(prev);
-    }
-  }else{
-    initLeaflet(prev);
-  }
-}
-
-function initLeaflet(prev){
-  // 해제
-  if (leafMap){ leafMap.remove(); leafMap = null; }
-  leafMap = L.map('map').setView([37.5665, 126.9780], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(leafMap);
-  leafMap.on('click', e=>{
-    if (leafMarker){ leafMap.removeLayer(leafMarker); }
-    leafMarker = L.marker(e.latlng).addTo(leafMap);
+  // 클릭하여 마커 지정
+  map.on('click', e=>{
+    if (mapMarker) map.removeLayer(mapMarker);
+    mapMarker = L.marker(e.latlng).addTo(map);
     setPickedText(e.latlng.lat, e.latlng.lng);
   });
+
   if (prev && prev.lat && prev.lng){
     const ll = [prev.lat, prev.lng];
-    leafMap.setView(ll, 15);
-    leafMarker = L.marker(ll).addTo(leafMap);
+    map.setView(ll, 15);
+    mapMarker = L.marker(ll).addTo(map);
     setPickedText(prev.lat, prev.lng);
   }else{
     setPickedText(null, null);
   }
 }
 
-function initNaver(prev){
-  // 해제
-  navMap = null; navMarker = null;
-  const center = (prev && prev.lat && prev.lng)
-    ? new naver.maps.LatLng(prev.lat, prev.lng)
-    : new naver.maps.LatLng(37.5665, 126.9780);
-  navMap = new naver.maps.Map('map', { center, zoom: 13 });
-  naver.maps.Event.addListener(navMap, 'click', (e)=>{
-    const ll = e.coord;
-    if (navMarker) navMarker.setMap(null);
-    navMarker = new naver.maps.Marker({ position: ll, map: navMap });
-    setPickedText(ll.y, ll.x);
-  });
-  if (prev && prev.lat && prev.lng){
-    navMarker = new naver.maps.Marker({ position: center, map: navMap });
-    navMap.setZoom(15);
-    setPickedText(prev.lat, prev.lng);
-  }else{
-    setPickedText(null, null);
-  }
+async function vworldGeocode(q){
+  if (!conf.vwKey) return null;
+  // 1) place 검색
+  try{
+    const u1 = new URL('https://api.vworld.kr/req/search');
+    u1.searchParams.set('service','search');
+    u1.searchParams.set('request','search');
+    u1.searchParams.set('version','2.0');
+    u1.searchParams.set('size','1');
+    u1.searchParams.set('page','1');
+    u1.searchParams.set('query', q);
+    u1.searchParams.set('type','place');
+    u1.searchParams.set('format','json');
+    u1.searchParams.set('key', conf.vwKey);
+    const r1 = await fetch(u1.toString());
+    const j1 = await r1.json();
+    const items = j1?.response?.result?.[0]?.items;
+    if (Array.isArray(items) && items.length && items[0].point){
+      const x = parseFloat(items[0].point.x), y = parseFloat(items[0].point.y);
+      if (isFinite(x) && isFinite(y)) return {lat:y, lng:x};
+    }
+  }catch(e){ /* continue */ }
+
+  // 2) 주소 → 좌표
+  try{
+    const u2 = new URL('https://api.vworld.kr/req/address');
+    u2.searchParams.set('service','address');
+    u2.searchParams.set('request','getcoord');
+    u2.searchParams.set('version','2.0');
+    u2.searchParams.set('crs','epsg:4326');
+    u2.searchParams.set('address', q);
+    u2.searchParams.set('refine','true');
+    u2.searchParams.set('simple','false');
+    u2.searchParams.set('format','json');
+    u2.searchParams.set('type','road');
+    u2.searchParams.set('key', conf.vwKey);
+    const r2 = await fetch(u2.toString());
+    const j2 = await r2.json();
+    const pt = j2?.response?.result?.point;
+    const x = parseFloat(pt?.x), y = parseFloat(pt?.y);
+    if (isFinite(x) && isFinite(y)) return {lat:y, lng:x};
+  }catch(e){ /* continue */ }
+
+  return null;
 }
 
 async function searchAddress(q){
   if (!q) return;
-  const useNaver = (conf.mapProvider==='naver' && conf.naverClientId && window.naver && window.naver.maps && naver.maps.Service);
   try{
-    if (useNaver){
-      naver.maps.Service.geocode({ query: q }, (status, res)=>{
-        if (status !== naver.maps.Service.Status.OK || !res?.v2?.addresses?.length){
-          alert('검색 결과가 없습니다.');
-          return;
-        }
-        const a = res.v2.addresses[0];
-        const lat = parseFloat(a.y), lng = parseFloat(a.x);
-        const ll = new naver.maps.LatLng(lat, lng);
-        navMap.setCenter(ll); navMap.setZoom(16);
-        if (navMarker) navMarker.setMap(null);
-        navMarker = new naver.maps.Marker({ position: ll, map: navMap });
-        setPickedText(lat, lng);
-      });
-    }else{
-      // Leaflet + Nominatim
+    let loc = await vworldGeocode(q);
+    if (!loc){
+      // 폴백: Nominatim
       const url = new URL('https://nominatim.openstreetmap.org/search');
       url.searchParams.set('q', q);
       url.searchParams.set('format', 'json');
@@ -703,15 +660,15 @@ async function searchAddress(q){
       url.searchParams.set('limit', '1');
       const r = await fetch(url.toString(), { headers:{'Accept-Language':'ko'} });
       const arr = await r.json();
-      if (arr && arr[0]){
-        const lat = parseFloat(arr[0].lat), lon = parseFloat(arr[0].lon);
-        leafMap.setView([lat, lon], 16);
-        if (leafMarker) leafMap.removeLayer(leafMarker);
-        leafMarker = L.marker([lat, lon]).addTo(leafMap);
-        setPickedText(lat, lon);
-      }else{
-        alert('검색 결과가 없습니다.');
-      }
+      if (arr && arr[0]) loc = { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
+    }
+    if (loc){
+      map.setView([loc.lat, loc.lng], 16);
+      if (mapMarker) map.removeLayer(mapMarker);
+      mapMarker = L.marker([loc.lat, loc.lng]).addTo(map);
+      setPickedText(loc.lat, loc.lng);
+    }else{
+      alert('검색 결과가 없습니다.');
     }
   }catch(e){
     alert('검색 오류: ' + e.message);
@@ -778,14 +735,12 @@ function loadTourToForm(t){
   $('#tourStart').valueAsDate = t.start ? new Date(t.start) : null;
   $('#tourEnd').valueAsDate   = t.end ? new Date(t.end) : null;
 
-  // 접수기간(datetime-local)
   const regS = t.regStart ? new Date(t.regStart) : null;
   const regE = t.regEnd   ? new Date(t.regEnd)   : null;
   $('#regStart').value = regS ? toLocalDT(regS) : '';
   $('#regEnd').value   = regE ? toLocalDT(regE) : '';
   updateStatusBadge();
 
-  // 종별 세트 (신규 필드 우선, 없으면 기존 divs 변환)
   let divSets = t.divSets;
   if (!Array.isArray(divSets) || !divSets.length){
     const m = t.divs || {};
@@ -793,7 +748,6 @@ function loadTourToForm(t){
   }
   setDivSets(divSets);
 
-  // 장소
   setPlaces(Array.isArray(t.places)? t.places : []);
 }
 function clearTourForm(){
@@ -812,7 +766,6 @@ $('#saveTourBtn').addEventListener('click', async ()=>{
     const name = ($('#tourName').value||'').trim();
     if (!name) return alert('대회명을 입력하세요.');
 
-    // 종별 세트
     const divSets = getDivSets().map(s=>({ group:s.group, divisions:(s.divisions||[]) }));
     const divs = {};
     divSets.forEach(s=>{
@@ -820,9 +773,7 @@ $('#saveTourBtn').addEventListener('click', async ()=>{
       (s.divisions||[]).forEach(d=>{ if (!divs[s.group].includes(d)) divs[s.group].push(d); });
     });
 
-    // 장소
     const places = getPlaces().filter(p=> p.name || p.address || (p.lat && p.lng));
-
     const regStart = $('#regStart').value || '';
     const regEnd   = $('#regEnd').value   || '';
     const status   = calcStatus(regStart, regEnd); // 자동 계산
@@ -833,11 +784,11 @@ $('#saveTourBtn').addEventListener('click', async ()=>{
       start: $('#tourStart').value || '',
       end: $('#tourEnd').value || '',
       regStart, regEnd,
-      status,          // ← 자동 계산된 값 전송(표시는 항상 클라이언트에서 재계산)
+      status,
       url: ($('#tourUrl').value || '').trim(),
-      divSets,         // 신규
-      divs,            // 레거시 호환
-      places           // [{name,address,lat,lng}]
+      divSets,
+      divs,
+      places
     };
 
     const j = await postJSON('upsertTournament', payload);
