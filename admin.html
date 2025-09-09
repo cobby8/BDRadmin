@@ -471,9 +471,12 @@ function computeReturnUrl(){
 function openJusoPopup(targetRow=null){
   if (FORM_LOCKED) return;
   addrPickTargetRow = targetRow;
-  const returnUrl = computeReturnUrl();
-  const url = `https://www.juso.go.kr/addrlink/addrLinkUrl.do?confmKey=${encodeURIComponent(JUSO_KEY)}&returnUrl=${encodeURIComponent(returnUrl)}&resultType=4`;
-  window.open(url,'jusoPopup','width=570,height=420,scrollbars=yes,resizable=yes');
+const returnUrl = location.origin + '/juso-callback.html';
+const url = 'https://www.juso.go.kr/addrlink/addrLinkUrl.do'
+          + '?confmKey=' + encodeURIComponent(JUSO_KEY)
+          + '&returnUrl=' + encodeURIComponent(returnUrl)
+          + '&resultType=4';
+window.open(url, 'jusoPopup', 'width=570,height=420,scrollbars=yes,resizable=yes');
 }
 window.__onJusoSelected = function(d){
   const v = {
