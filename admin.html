@@ -50,6 +50,15 @@
   .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff;cursor:pointer}
   .list{display:grid;gap:10px}
   .hr{height:1px;background:#eef2f7;margin:8px 0}
+
+  /* 주소검색 모달 */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:20px;z-index:9999}
+  .modal .panel{background:#fff;width:min(720px,96vw);max-height:90vh;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.18);display:flex;flex-direction:column}
+  .modal .panel header{padding:12px 16px;border-bottom:1px solid #eef2f7}
+  .modal .panel main{padding:12px 16px;overflow:auto}
+  .result{border:1px solid #e6ecf5;border-radius:12px;padding:10px;margin:8px 0;display:grid;gap:6px}
+  .result .title{font-weight:700}
+  .result small{color:#64748b}
 </style>
 </head>
 <body>
@@ -70,7 +79,7 @@
         <label>대회 필터</label>
         <select id="tourFilter"><option value="">전체 대회</option></select>
       </div>
-      <div class="muted" style="align-self:end">※ 상단 ⚙️에서 Apps Script URL과 <b>VWorld API Key</b>를 확인/변경할 수 있습니다.</div>
+      <div class="muted" style="align-self:end">※ ⚙️에서 Apps Script URL과 <b>VWorld API Key</b>를 확인/변경할 수 있습니다.</div>
     </div>
   </div>
 
@@ -101,9 +110,9 @@
           <input id="tourUrl" placeholder="안내 페이지 URL (선택)">
         </div>
 
-        <!-- 2) 종별(구분/종별) : 빠른추가(드롭다운)만 유지 -->
+        <!-- 2) 종별(구분/종별) : 체크박스 다중 추가 -->
         <div class="section-title">종별 설정</div>
-        <div class="subtle">구분을 선택하고 종별을 드롭다운에서 골라 ‘추가’를 눌러 등록하세요.</div>
+        <div class="subtle">구분을 선택하고 <b>종별</b>을 여러 개 체크한 뒤 <b>적용</b>을 누르면 한 번에 추가됩니다. 칩을 클릭하면 제거됩니다.</div>
         <div id="divSetList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addDivSetBtn">+ 구분/종별 추가</button>
@@ -111,17 +120,17 @@
 
         <div class="hr"></div>
 
-        <!-- 3) 대회장소(복수) : VWorld 검색만 -->
+        <!-- 3) 대회장소(복수) : VWorld 주소검색 모달 -->
         <div class="section-title">대회장소</div>
-        <div class="subtle">주소/장소명을 입력 후 <b>검색</b>을 누르면 주소와 위도·경도가 자동으로 채워집니다. (VWorld 사용)</div>
+        <div class="subtle">우측 <b>+ 장소 추가</b>를 누르면 VWorld 주소검색 창이 열립니다. 결과에서 선택하면 행이 자동으로 추가됩니다.</div>
         <div id="placeList" class="list" style="margin-top:8px"></div>
-        <div class="toolbar" style="margin-top:6px">
+        <div class="toolbar" style="margin-top:6px;justify-content:flex-end">
           <button class="btn ghost" id="addPlaceBtn">+ 장소 추가</button>
         </div>
 
         <div class="hr"></div>
 
-        <!-- 4-1) 대회기간 (윗줄 단독 섹션) -->
+        <!-- 4-1) 대회기간 -->
         <div class="section-title">대회기간</div>
         <div class="grid grid-2">
           <input id="tourStart" type="date" placeholder="시작일">
@@ -129,7 +138,7 @@
         </div>
         <div class="help" style="margin-top:4px">대회가 열리는 날짜 구간입니다.</div>
 
-        <!-- 4-2) 접수기간 (아랫줄 단독 섹션) -->
+        <!-- 4-2) 접수기간 -->
         <div class="section-title" style="margin-top:14px">접수기간</div>
         <div class="grid grid-2">
           <input id="regStart" type="datetime-local" placeholder="접수 시작">
@@ -137,12 +146,17 @@
         </div>
         <div class="help" style="margin-top:4px">참가신청 접수 가능 시간입니다. (날짜+시간)</div>
 
-        <!-- 상태(자동) + 저장 -->
+        <!-- 5) 보안(관리코드) + 상태(자동) + 저장 -->
         <div class="grid grid-2" style="margin-top:12px;align-items:end">
           <div>
-            <label>상태(자동)</label>
-            <div id="tourStatusBadge" class="badge">상태미정</div>
-            <div class="help">접수기간에 따라 자동 표시(접수전/접수중/마감). 관리자 수동 변경 불가.</div>
+            <label>대회관리 코드 (필수)</label>
+            <input id="adminCode" type="password" placeholder="이 대회를 관리할 비밀번호">
+            <div class="help">신규 생성 시 입력한 코드가 설정됩니다. 이후 수정/삭제 시 동일한 코드가 필요합니다.</div>
+            <div style="margin-top:8px">
+              <label>상태(자동)</label>
+              <div id="tourStatusBadge" class="badge">상태미정</div>
+              <div class="help">접수기간에 따라 자동 표시(접수전/접수중/마감). 관리자 수동 변경 불가.</div>
+            </div>
           </div>
           <div class="toolbar" style="justify-content:flex-end;gap:8px">
             <button class="btn danger" id="deleteTourBtn">삭제</button>
@@ -183,11 +197,29 @@
   </div>
 </div>
 
+<!-- 주소검색 모달 (VWorld) -->
+<div class="modal" id="addrModal">
+  <div class="panel">
+    <header style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-weight:700">주소 검색 (VWorld)</div>
+      <div class="toolbar"><button class="btn" id="addrCloseBtn">닫기</button></div>
+    </header>
+    <main>
+      <div class="grid grid-3" style="margin-bottom:8px">
+        <input id="addrQuery" placeholder="주소/장소명 입력 (예: 서울대 체육관)">
+        <button class="btn" id="addrSearchBtn">검색</button>
+        <div class="muted" id="addrHint" style="align-self:center">최대 10건까지 표시됩니다.</div>
+      </div>
+      <div id="addrResults"></div>
+    </main>
+  </div>
+</div>
+
 <script>
 /* ========= 기본 상수 ========= */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 const APPLY_BASE  = 'https://bdrjoin.netlify.app/';
-const DEFAULT_VWORLD_KEY = '85739F39-152F-35BC-9A7F-0EB05AE0EF77'; // 요청하신 인증키 기본 적용
+const DEFAULT_VWORLD_KEY = '85739F39-152F-35BC-9A7F-0EB05AE0EF77';
 
 /* ========= 로컬 저장 ========= */
 const store = {
@@ -197,7 +229,7 @@ const store = {
 };
 const conf = store.load();
 if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); }
-if (!conf.vwKey) { conf.vwKey = DEFAULT_VWORLD_KEY; store.save(conf); } // 키 기본 주입
+if (!conf.vwKey) { conf.vwKey = DEFAULT_VWORLD_KEY; store.save(conf); }
 
 /* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
@@ -210,7 +242,7 @@ $('#settingsBtn').addEventListener('click', ()=>{
   if (valUrl === null) return;
   conf.appUrl = valUrl.trim();
 
-  const vw = prompt('VWorld API Key (변경 시 입력, 현재 값은 자동 적용됨):', conf.vwKey || '');
+  const vw = prompt('VWorld API Key (변경 시 입력):', conf.vwKey || '');
   if (vw !== null) conf.vwKey = (vw||'').trim();
 
   store.save(conf);
@@ -256,9 +288,7 @@ async function health(){
   }
 }
 
-/* ========= 대회 데이터 ========= */
-let TOURS = {};
-let TOUR_ARRAY = [];
+/* ========= 유틸 ========= */
 function fmtDate(v){
   if (!v) return '';
   const d = new Date(v);
@@ -289,6 +319,11 @@ function statusBadgeHtml(status){
   const c = map[status] || map['상태미정'];
   return `<span class="badge" style="background:${c.bg};border-color:${c.bd};color:${c.fg}">${status}</span>`;
 }
+function stripTags(s=''){ return s.replace(/<[^>]+>/g,''); }
+
+/* ========= 대회 목록/필터 ========= */
+let TOURS = {};
+let TOUR_ARRAY = [];
 async function loadTournaments(){
   const j = await getJSON(apiUrl('tournaments'));
   TOURS = {}; TOUR_ARRAY = j.rows || [];
@@ -416,7 +451,7 @@ async function loadTeams(){
   }
 }
 
-/* ========= 종별(구분/종별) - 드롭다운만 ========= */
+/* ========= 종별(구분/종별) : 체크박스 ========= */
 const DIVISION_PRESETS = {
   '일반부': ['D3','D4','D5','D6','D7'],
   '대학부': ['U1','U2','U3','UW'],
@@ -431,14 +466,14 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   const groupSel = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
   groupWrap.appendChild(groupSel);
 
-  // 빠른 추가(드롭다운)
-  const quickWrap = el(`<div><label style="margin:0 0 6px">빠른 추가(드롭다운)</label></div>`);
-  const quickBox = el(`<div style="display:flex;gap:8px;align-items:center"></div>`);
-  const quickSel = el(`<select class="divQuickSel"></select>`);
-  const quickBtn = el(`<button class="btn">추가</button>`);
-  quickBox.appendChild(quickSel);
-  quickBox.appendChild(quickBtn);
-  quickWrap.appendChild(quickBox);
+  // 종별(체크박스) + 적용
+  const catsWrap = el(`<div><label style="margin:0 0 6px">종별</label></div>`);
+  const catsBox = el(`<div class="chips" style="gap:12px"></div>`);
+  const applyBtn = el(`<button class="btn">적용</button>`);
+  const catContainer = el(`<div style="display:flex;gap:12px;align-items:center"></div>`);
+  catContainer.appendChild(catsBox);
+  catContainer.appendChild(applyBtn);
+  catsWrap.appendChild(catContainer);
 
   // 선택 결과 칩
   const tags = el(`<div><label style="margin:0 0 6px">선택 결과</label><div class="chips"></div></div>`);
@@ -453,8 +488,14 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   // 내부 상태
   let values = Array.from(init.divisions || []);
 
-  function renderOptions(group){
-    quickSel.innerHTML = DIVISION_PRESETS[group].map(d=>`<option value="${d}">${d}</option>`).join('');
+  function renderCheckboxes(group){
+    const opts = DIVISION_PRESETS[group];
+    catsBox.innerHTML = opts.map(v=>{
+      const id = 'cb_'+group+'_'+v+'_'+Math.random().toString(36).slice(2,7);
+      return `<label style="display:flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px">
+        <input type="checkbox" value="${v}" id="${id}"><span>${v}</span>
+      </label>`;
+    }).join('');
   }
   function refreshChips(){
     chipsBox.innerHTML = values.length
@@ -468,23 +509,25 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
       });
     });
   }
-  function addQuick(){
-    const v = quickSel.value;
-    if (!values.includes(v)) values.push(v);
+  function applyChecked(){
+    const checked = [...catsBox.querySelectorAll('input[type="checkbox"]:checked')].map(i=>i.value);
+    checked.forEach(v=>{ if (!values.includes(v)) values.push(v); });
+    // 체크 해제
+    catsBox.querySelectorAll('input[type="checkbox"]').forEach(i=> i.checked=false);
     refreshChips();
   }
 
-  groupSel.addEventListener('change', ()=> renderOptions(groupSel.value));
-  quickBtn.addEventListener('click', addQuick);
+  groupSel.addEventListener('change', ()=> renderCheckboxes(groupSel.value));
+  applyBtn.addEventListener('click', applyChecked);
 
   // 초기화
   groupSel.value = init.group || '일반부';
-  renderOptions(groupSel.value);
+  renderCheckboxes(groupSel.value);
   refreshChips();
 
   // 조립
   row.appendChild(groupWrap);
-  row.appendChild(quickWrap);
+  row.appendChild(catsWrap);
   row.appendChild(tags);
   row.appendChild(el('<div></div>'));
   row.appendChild(del);
@@ -503,117 +546,126 @@ function setDivSets(list){
 }
 $('#addDivSetBtn').addEventListener('click', ()=> $('#divSetList').appendChild(makeDivSetRow()) );
 
-/* ========= VWorld 주소 검색 전용 ========= */
-function stripTags(s=''){ return s.replace(/<[^>]+>/g,''); }
+/* ========= VWorld 주소검색 모달 ========= */
+let addrPickTargetRow = null; // 특정 행 갱신용, null이면 새 행 추가
+function openAddrModal(targetRow=null){
+  addrPickTargetRow = targetRow;
+  $('#addrQuery').value = '';
+  $('#addrResults').innerHTML = '';
+  $('#addrModal').style.display = 'flex';
+  setTimeout(()=> $('#addrQuery').focus(), 0);
+}
+function closeAddrModal(){ $('#addrModal').style.display = 'none'; addrPickTargetRow = null; }
+$('#addrCloseBtn').addEventListener('click', closeAddrModal);
+document.getElementById('addrModal').addEventListener('click', (e)=>{
+  if (e.target.id === 'addrModal') closeAddrModal();
+});
+document.addEventListener('keydown', (e)=>{
+  if (e.key==='Escape' && $('#addrModal').style.display==='flex') closeAddrModal();
+});
 
-async function vworldGeocode(q){
+async function vworldSearch(q){
   const key = conf.vwKey;
-  if (!key) return null;
-
-  // 1) 장소 검색
+  if (!key) return [];
+  const u = new URL('https://api.vworld.kr/req/search');
+  u.searchParams.set('service','search');
+  u.searchParams.set('request','search');
+  u.searchParams.set('version','2.0');
+  u.searchParams.set('size','10');
+  u.searchParams.set('page','1');
+  u.searchParams.set('query', q);
+  u.searchParams.set('type','place');     // 장소명 우선
+  u.searchParams.set('format','json');
+  u.searchParams.set('key', key);
+  const r = await fetch(u.toString());
+  const j = await r.json();
+  const items = j?.response?.result?.[0]?.items || [];
+  return items.map(it=>{
+    const name = stripTags(it.title||'');
+    const road = it.address?.road || '';
+    const parcel = it.address?.parcel || '';
+    const x = parseFloat(it.point?.x), y = parseFloat(it.point?.y);
+    return { name, road, parcel, lat:y, lng:x };
+  }).filter(v=> isFinite(v.lat) && isFinite(v.lng));
+}
+async function addrSearch(){
+  const q = $('#addrQuery').value.trim();
+  if (!q) { alert('검색어를 입력하세요.'); return; }
   try{
-    const u1 = new URL('https://api.vworld.kr/req/search');
-    u1.searchParams.set('service','search');
-    u1.searchParams.set('request','search');
-    u1.searchParams.set('version','2.0');
-    u1.searchParams.set('size','1');
-    u1.searchParams.set('page','1');
-    u1.searchParams.set('query', q);
-    u1.searchParams.set('type','place');
-    u1.searchParams.set('format','json');
-    u1.searchParams.set('key', key);
-    const r1 = await fetch(u1.toString());
-    const j1 = await r1.json();
-    const it = j1?.response?.result?.[0]?.items?.[0];
-    if (it?.point?.x && it?.point?.y){
-      const lng = parseFloat(it.point.x), lat = parseFloat(it.point.y);
-      const address = it.address?.road || it.address?.parcel || it.address || stripTags(it.title) || '';
-      return { lat, lng, address: address };
+    const list = await vworldSearch(q);
+    if (!list.length){
+      $('#addrResults').innerHTML = '<div class="muted">검색 결과가 없습니다.</div>';
+      return;
     }
-  }catch(e){ /* continue */ }
+    $('#addrResults').innerHTML = list.map((v,i)=>`
+      <div class="result" data-i="${i}">
+        <div class="title">${v.name||'(이름 없음)'}</div>
+        <small>${v.road || v.parcel || ''}</small>
+        <small>좌표: ${v.lat.toFixed(6)}, ${v.lng.toFixed(6)}</small>
+        <div class="right"><button class="btn" data-pick="${i}">선택</button></div>
+      </div>
+    `).join('');
+    // 선택 이벤트
+    $('#addrResults').querySelectorAll('[data-pick]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const i = parseInt(btn.getAttribute('data-pick'));
+        applyAddress(list[i]);
+      });
+    });
+  }catch(e){
+    alert('검색 오류: ' + e.message);
+  }
+}
+$('#addrSearchBtn').addEventListener('click', addrSearch);
+$('#addrQuery').addEventListener('keydown', e=>{ if(e.key==='Enter') addrSearch(); });
 
-  // 2) 주소 → 좌표
-  try{
-    const u2 = new URL('https://api.vworld.kr/req/address');
-    u2.searchParams.set('service','address');
-    u2.searchParams.set('request','getcoord');
-    u2.searchParams.set('version','2.0');
-    u2.searchParams.set('crs','epsg:4326');
-    u2.searchParams.set('address', q);
-    u2.searchParams.set('refine','true');
-    u2.searchParams.set('simple','false');
-    u2.searchParams.set('type','road');
-    u2.searchParams.set('format','json');
-    u2.searchParams.set('key', key);
-    const r2 = await fetch(u2.toString());
-    const j2 = await r2.json();
-    const pt = j2?.response?.result?.point;
-    const x = parseFloat(pt?.x), y = parseFloat(pt?.y);
-    if (isFinite(x) && isFinite(y)){
-      const txt = j2?.response?.refined?.text || j2?.response?.input?.address || q;
-      return { lat:y, lng:x, address: txt };
-    }
-  }catch(e){ /* continue */ }
-
-  return null;
+function applyAddress(v){
+  if (addrPickTargetRow){
+    // 기존 행 갱신
+    fillPlaceRow(addrPickTargetRow, v);
+  }else{
+    // 새 행 추가
+    const row = makePlaceRow({});
+    $('#placeList').appendChild(row);
+    fillPlaceRow(row, v);
+  }
+  closeAddrModal();
 }
 
-async function nominatimGeocode(q){
-  const url = new URL('https://nominatim.openstreetmap.org/search');
-  url.searchParams.set('q', q);
-  url.searchParams.set('format', 'json');
-  url.searchParams.set('addressdetails', '1');
-  url.searchParams.set('limit', '1');
-  const r = await fetch(url.toString(), { headers:{'Accept-Language':'ko'} });
-  const arr = await r.json();
-  if (arr && arr[0]) return { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon), address: arr[0].display_name };
-  return null;
-}
-
-async function searchAddressSimple(q){
-  let loc = await vworldGeocode(q);
-  if (!loc) loc = await nominatimGeocode(q);
-  return loc;
-}
-
-/* 장소 행: 지도 없이 검색만 */
+/* 장소 행(재검색 지원) */
 function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
   const row = el(`<div class="place-item"></div>`);
   const name = el(`<div><label style="margin:0 0 6px">장소명</label><input placeholder="예: 서울대학교 종합체육관" value="${init.name||''}"></div>`);
-  const addr = el(`<div><label style="margin:0 0 6px">주소/검색어</label><input placeholder="예: 관악구 대학동 ○○ 또는 장소명" value="${init.address||''}"></div>`);
+  const addr = el(`<div><label style="margin:0 0 6px">주소</label><input placeholder="검색으로 입력하세요" value="${init.address||''}"></div>`);
   const lat  = el(`<div><label style="margin:0 0 6px">위도</label><input placeholder="37.xxxxxx" value="${init.lat||''}"></div>`);
   const lng  = el(`<div><label style="margin:0 0 6px">경도</label><input placeholder="126.xxxxxx" value="${init.lng||''}"></div>`);
   const ctrl = el(`<div style="display:flex;gap:6px;align-items:flex-end">
-    <button class="btn" data-search>검색</button>
+    <button class="btn" data-research>재검색</button>
     <button class="btn danger" data-del>삭제</button>
   </div>`);
-
-  async function doSearch(){
-    const q = addr.querySelector('input').value.trim() || name.querySelector('input').value.trim();
-    if (!q) { alert('검색어를 입력하세요.'); return; }
-    const r = await searchAddressSimple(q);
-    if (!r){ alert('검색 결과가 없습니다.'); return; }
-    addr.querySelector('input').value = r.address || addr.querySelector('input').value;
-    lat .querySelector('input').value = r.lat.toFixed(6);
-    lng .querySelector('input').value = r.lng.toFixed(6);
-  }
-
-  ctrl.querySelector('[data-search]').addEventListener('click', doSearch);
+  ctrl.querySelector('[data-research]').addEventListener('click', ()=> openAddrModal(row));
   ctrl.querySelector('[data-del]').addEventListener('click', ()=> row.remove());
-  addr.querySelector('input').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
 
   row.appendChild(name); row.appendChild(addr); row.appendChild(lat); row.appendChild(lng); row.appendChild(ctrl);
+
   row.getValue = ()=>({
     name: name.querySelector('input').value.trim(),
     address: addr.querySelector('input').value.trim(),
     lat: parseFloat(lat.querySelector('input').value),
     lng: parseFloat(lng.querySelector('input').value)
   });
+  row.setValues = (v)=> fillPlaceRow(row, v);
   return row;
 }
+function fillPlaceRow(row, v){
+  const [nameI, addrI, latI, lngI] = row.querySelectorAll('input');
+  nameI.value = v.name || nameI.value;
+  addrI.value = (v.road || v.parcel || v.address || addrI.value || '');
+  if (isFinite(v.lat)) latI.value = Number(v.lat).toFixed(6);
+  if (isFinite(v.lng)) lngI.value = Number(v.lng).toFixed(6);
+}
 function getPlaces(){ return [...document.querySelectorAll('#placeList .place-item')].map(it => it.getValue()); }
-function setPlaces(list){ const box=$('#placeList'); box.innerHTML=''; (list&&list.length?list:[{}]).forEach(v=> box.appendChild(makePlaceRow(v))); }
-$('#addPlaceBtn').addEventListener('click', ()=> $('#placeList').appendChild(makePlaceRow()) );
+function setPlaces(list){ const box=$('#placeList'); box.innerHTML=''; (list&&list.length?list:[]).forEach(v=> box.appendChild(makePlaceRow(v))); }
 
 /* ========= 폼 로드/초기화 ========= */
 function toLocalDT(d){
@@ -650,64 +702,72 @@ function loadTourToForm(t){
   setDivSets(divSets);
 
   setPlaces(Array.isArray(t.places)? t.places : []);
+  $('#adminCode').value = ''; // 보안상 불러오지 않음
 }
 function clearTourForm(){
   $('#tourFormTitle').textContent = '대회 등록';
-  ['tourId','tourName','tourUrl','tourStart','tourEnd','regStart','regEnd'].forEach(id=> $('#'+id).value = '');
+  ['tourId','tourName','tourUrl','tourStart','tourEnd','regStart','regEnd','adminCode'].forEach(id=> $('#'+id).value = '');
   setDivSets([{group:'일반부', divisions:[]}]);
-  setPlaces([{}]);
+  setPlaces([]);
   updateStatusBadge();
 }
 
-/* ========= 저장/삭제 ========= */
+/* ========= 저장/삭제 (관리코드 필수) ========= */
 $('#newTourBtn').addEventListener('click', clearTourForm);
 
-$('#saveTourBtn').addEventListener('click', async ()=>{
-  try{
-    const name = ($('#tourName').value||'').trim();
-    if (!name) return alert('대회명을 입력하세요.');
+async function saveTournament(){
+  const name = ($('#tourName').value||'').trim();
+  if (!name) return alert('대회명을 입력하세요.');
+  const adminCode = ($('#adminCode').value||'').trim();
+  if (!adminCode) return alert('관리코드를 입력하세요.');
 
-    const divSets = getDivSets().map(s=>({ group:s.group, divisions:(s.divisions||[]) }));
-    const divs = {};
-    divSets.forEach(s=>{
-      if (!divs[s.group]) divs[s.group] = [];
-      (s.divisions||[]).forEach(d=>{ if (!divs[s.group].includes(d)) divs[s.group].push(d); });
-    });
+  const divSets = getDivSets().map(s=>({ group:s.group, divisions:(s.divisions||[]) }));
+  const divs = {};
+  divSets.forEach(s=>{
+    if (!divs[s.group]) divs[s.group] = [];
+    (s.divisions||[]).forEach(d=>{ if (!divs[s.group].includes(d)) divs[s.group].push(d); });
+  });
 
-    const places = getPlaces().filter(p=> p.name || p.address || (p.lat && p.lng));
-    const regStart = $('#regStart').value || '';
-    const regEnd   = $('#regEnd').value   || '';
-    const status   = calcStatus(regStart, regEnd); // 자동 계산
+  const places = getPlaces().filter(p=> p.name || p.address || (p.lat && p.lng));
+  const regStart = $('#regStart').value || '';
+  const regEnd   = $('#regEnd').value   || '';
+  const status   = calcStatus(regStart, regEnd); // 자동 계산
 
-    const payload = {
-      tourId: ($('#tourId').value || '').trim(),
-      name,
-      start: $('#tourStart').value || '',
-      end: $('#tourEnd').value || '',
-      regStart, regEnd,
-      status,
-      url: ($('#tourUrl').value || '').trim(),
-      divSets,
-      divs,
-      places
-    };
+  const payload = {
+    tourId: ($('#tourId').value || '').trim(),
+    name,
+    start: $('#tourStart').value || '',
+    end: $('#tourEnd').value || '',
+    regStart, regEnd,
+    status,
+    url: ($('#tourUrl').value || '').trim(),
+    divSets,
+    divs,
+    places,
+    adminCode // ★ 항상 전송: 신규=설정, 기존=검증
+  };
 
-    const j = await postJSON('upsertTournament', payload);
-    if (!j.ok) return alert('저장 실패: ' + (j.error||'unknown'));
-    await loadTournaments();
-    if (j.tourId) $('#tourId').value = j.tourId;
-    alert('저장되었습니다.');
-  }catch(e){
-    alert('저장 중 오류: ' + e.message);
+  const j = await postJSON('upsertTournament', payload);
+  if (!j.ok){
+    alert('저장 실패: ' + (j.error||'unknown'));
+    return;
   }
+  await loadTournaments();
+  if (j.tourId) $('#tourId').value = j.tourId;
+  alert('저장되었습니다.');
+}
+$('#saveTourBtn').addEventListener('click', async ()=>{
+  try{ await saveTournament(); }catch(e){ alert('저장 중 오류: ' + e.message); }
 });
 
 $('#deleteTourBtn').addEventListener('click', async ()=>{
   const id = ($('#tourId').value || '').trim();
   if (!id) return alert('삭제할 대회가 선택되지 않았습니다.');
+  const adminCode = ($('#adminCode').value||'').trim();
+  if (!adminCode) return alert('관리코드를 입력하세요.');
   if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
   try{
-    const j = await postJSON('removeTournament', { tourId: id });
+    const j = await postJSON('removeTournament', { tourId: id, adminCode });
     if (!j.ok) return alert('삭제 실패: ' + (j.error||'unknown'));
     clearTourForm();
     await loadTournaments();
@@ -726,6 +786,7 @@ $('#reloadBtn').addEventListener('click', async ()=>{
 $('#tourFilter').addEventListener('change', loadTeams);
 $('#searchBtn').addEventListener('click', loadTeams);
 $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
+$('#addPlaceBtn').addEventListener('click', ()=> openAddrModal(null) );
 
 /* ========= 부트 ========= */
 (async function boot(){
