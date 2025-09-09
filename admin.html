@@ -21,7 +21,7 @@
   input:focus,select:focus,textarea:focus{border-color:var(--blue)}
   .btn{padding:10px 14px;border-radius:12px;border:1px solid #dfe6ee;background:#fff;cursor:pointer}
   .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .btn.danger{background:#fff;color:var(--red);border-color:#ffd1d1}
+  .btn.danger{background:#fff;color:#ef4444;border-color:#ffd1d1}
   .btn.ghost{background:#fff;color:#334155;border-color:#e6ecf5}
   .btn:disabled{opacity:.5;cursor:not-allowed}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -48,20 +48,16 @@
   .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff;cursor:pointer}
   .list{display:grid;gap:10px}
   .hr{height:1px;background:#eef2f7;margin:8px 0}
-
-  /* 종별 드롭다운(체크박스) 모달 */
+  .input-icon{position:relative}
+  .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:16px}
+  .offscreen{position:absolute;left:-9999px;opacity:0;width:0;height:0;pointer-events:none}
+  .locked *[data-editable]{pointer-events:none; opacity:.9}
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:20px;z-index:9999}
   .modal .panel{background:#fff;width:min(720px,96vw);max-height:90vh;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.18);display:flex;flex-direction:column}
   .modal .panel header{padding:12px 16px;border-bottom:1px solid #eef2f7}
   .modal .panel main{padding:12px 16px;overflow:auto}
   .dd-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-height:220px;overflow:auto;margin:6px 0}
   .dd-actions{display:flex;gap:8px;justify-content:flex-end}
-
-  /* 관리코드 눈아이콘 + 자동완성 우회 */
-  .input-icon{position:relative}
-  .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:16px}
-  .offscreen{position:absolute;left:-9999px;opacity:0;width:0;height:0;pointer-events:none}
-  .locked *[data-editable]{pointer-events:none; opacity:.9}
 </style>
 </head>
 <body>
@@ -75,7 +71,7 @@
     </div>
   </header>
 
-  <!-- 폼 자동완성 트랩(크롬 아이디/비번 자동입력 우회) -->
+  <!-- 크롬 자동완성 트랩 -->
   <input class="offscreen" type="text" autocomplete="username" />
   <input class="offscreen" type="password" autocomplete="current-password" />
 
@@ -111,16 +107,14 @@
       <div id="formArea" class="locked">
         <label id="tourFormTitle">대회 등록/수정</label>
 
-        <!-- 1) 기본정보 -->
         <div class="grid">
           <input id="tourId" placeholder="자동생성 (수정 시 고정)" disabled>
           <input id="tourName" placeholder="대회명" data-editable>
           <input id="tourUrl" placeholder="안내 페이지 URL (선택)" data-editable inputmode="url" autocomplete="off" spellcheck="false">
         </div>
 
-        <!-- 2) 종별(칩만 표시, 편집시 추가가능) -->
         <div class="section-title">종별 설정</div>
-        <div class="subtle">수정 모드에서만 <b>+ 구분/종별 추가</b> 버튼이 활성화됩니다. 칩을 클릭하면 제거됩니다.</div>
+        <div class="subtle">편집 모드에서만 <b>+ 구분/종별 추가</b>가 가능합니다. 신규 대회에서는 기본 행 없이 버튼만 보입니다.</div>
         <div id="divSetList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px;justify-content:flex-end">
           <button class="btn ghost" id="addDivSetBtn" data-editable disabled>+ 구분/종별 추가</button>
@@ -128,9 +122,8 @@
 
         <div class="hr"></div>
 
-        <!-- 3) 대회장소(행안부 팝업) -->
         <div class="section-title">대회장소</div>
-        <div class="subtle">우측 <b>+ 장소 추가</b>를 누르면 행안부 주소검색 팝업이 열립니다. 결과에서 선택하면 행이 추가됩니다.</div>
+        <div class="subtle">+ 장소 추가 클릭 → 행안부 주소검색 팝업 → 선택하면 자동 입력됩니다.</div>
         <div id="placeList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px;justify-content:flex-end">
           <button class="btn ghost" id="addPlaceBtn" data-editable disabled>+ 장소 추가</button>
@@ -138,7 +131,6 @@
 
         <div class="hr"></div>
 
-        <!-- 4-1) 대회기간 -->
         <div class="section-title">대회기간</div>
         <div class="grid grid-2">
           <input id="tourStart" type="date" placeholder="시작일" data-editable>
@@ -146,7 +138,6 @@
         </div>
         <div class="help" style="margin-top:4px">대회가 열리는 날짜 구간입니다.</div>
 
-        <!-- 4-2) 접수기간 -->
         <div class="section-title" style="margin-top:14px">접수기간</div>
         <div class="grid grid-2">
           <input id="regStart" type="datetime-local" placeholder="접수 시작" data-editable>
@@ -154,7 +145,6 @@
         </div>
         <div class="help" style="margin-top:4px">참가신청 접수 가능 시간입니다. (날짜+시간)</div>
 
-        <!-- 5) 보안(관리코드) + 상태(자동) + 저장 -->
         <div class="grid grid-2" style="margin-top:12px;align-items:end">
           <div>
             <label>대회관리 코드 (필수)</label>
@@ -167,7 +157,7 @@
             <div style="margin-top:8px">
               <label>상태(자동)</label>
               <div id="tourStatusBadge" class="badge">상태미정</div>
-              <div class="help">접수기간에 따라 자동 표시(접수전/접수중/마감). 관리자 수동 변경 불가.</div>
+              <div class="help">접수기간에 따라 자동 표시(접수전/접수중/마감).</div>
             </div>
           </div>
           <div class="toolbar" style="justify-content:flex-end;gap:8px">
@@ -235,10 +225,11 @@
 </div>
 
 <script>
-/* ================== 상수 / 설정 ================== */
+/* ===== 상수 / 설정 ===== */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 const APPLY_BASE  = 'https://bdrjoin.netlify.app/';
-const JUSO_KEY    = 'U01TX0FVVEgyMDI1MDkwOTIzNTcyMjExNjE2NDQ='; // 행안부 팝업 승인키
+const JUSO_KEY    = 'U01TX0FVVEgyMDI1MDkwOTIzNTcyMjExNjE2NDQ=';
+const JUSO_RETURN = location.origin + '/juso-callback.html'; // 고정 콜백
 
 const store = {
   key: 'BDR_ADMIN_CONF',
@@ -251,7 +242,7 @@ if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); 
 const $ = s => document.querySelector(s);
 const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
 
-/* ===== 행안부 팝업 콜백 처리(404 방지용 자체 리턴 페이지) ===== */
+/* ===== 행안부 콜백(팝업에서 직접 열렸을 때) 처리 가드 ===== */
 (function maybeJusoReturn(){
   const p = new URLSearchParams(location.search);
   if (p.get('inputYn') === 'Y' && window.opener && window.opener.__onJusoSelected){
@@ -260,8 +251,13 @@ const el = html => { const t=document.createElement('template'); t.innerHTML=htm
     setTimeout(()=> window.close(), 0);
   }
 })();
+/* postMessage 경로도 수신 */
+window.addEventListener('message', (e)=>{
+  if (!e.data || e.data.type !== 'JUSO_SELECTED') return;
+  if (typeof __onJusoSelected === 'function') __onJusoSelected(e.data.payload);
+});
 
-/* ================== 유틸 ================== */
+/* ===== 유틸 ===== */
 function apiUrl(path, q={}){
   const base = (conf.appUrl||'').trim();
   if (!base) throw new Error('Web App URL이 설정되지 않았습니다. 우상단 ⚙️에서 설정하세요.');
@@ -281,38 +277,13 @@ async function health(){
   catch{ $('#healthDot').style.color = '#ef4444'; }
 }
 function pad(n){ return String(n).padStart(2,'0'); }
-function fmtDate(v){
-  if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v);
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-/* 문자열 중심 포맷(타임존 영향 제거) */
-function toInputDateOnly(src){
-  if(!src) return '';
-  if(typeof src==='string'){ const m=src.match(/^(\d{4}-\d{2}-\d{2})/); if(m) return m[1]; }
-  const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  return '';
-}
-function toInputDT(src){
-  if(!src) return '';
-  if(typeof src==='string'){
-    const m = src.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
-    if (m) return `${m[1]}T${m[2]}:${m[3]}`;
-  }
-  const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return '';
-}
-function calcStatus(regStart, regEnd){
-  if (!regStart || !regEnd) return '상태미정';
-  const s=new Date(regStart), e=new Date(regEnd), now=new Date();
-  if(isNaN(s)||isNaN(e)) return '상태미정';
-  if(now<s) return '접수전'; if(now>e) return '마감'; return '접수중';
-}
-function statusBadgeHtml(status){
-  const c={ '접수중':{bg:'#ecfdf5',bd:'#d1fae5',fg:'#16a34a'}, '접수전':{bg:'#eff6ff',bd:'#dbeafe',fg:'#1769ff'}, '마감':{bg:'#fef2f2',bd:'#fee2e2',fg:'#ef4444'}, '상태미정':{bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'} }[status] || {bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'};
-  return `<span class="badge" style="background:${c.bg};border-color:${c.bd};color:${c.fg}">${status}</span>`;
-}
+function fmtDate(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function toInputDateOnly(src){ if(!src) return ''; if(typeof src==='string'){ const m=src.match(/^(\d{4}-\d{2}-\d{2})/); if(m) return m[1]; } const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; return ''; }
+function toInputDT(src){ if(!src) return ''; if(typeof src==='string'){ const m = src.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/); if (m) return `${m[1]}T${m[2]}:${m[3]}`; } const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; return ''; }
+function calcStatus(regStart, regEnd){ if (!regStart || !regEnd) return '상태미정'; const s=new Date(regStart), e=new Date(regEnd), now=new Date(); if(isNaN(s)||isNaN(e)) return '상태미정'; if(now<s) return '접수전'; if(now>e) return '마감'; return '접수중'; }
+function statusBadgeHtml(status){ const c={ '접수중':{bg:'#ecfdf5',bd:'#d1fae5',fg:'#16a34a'}, '접수전':{bg:'#eff6ff',bd:'#dbeafe',fg:'#1769ff'}, '마감':{bg:'#fef2f2',bd:'#fee2e2',fg:'#ef4444'}, '상태미정':{bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'} }[status] || {bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'}; return `<span class="badge" style="background:${c.bg};border-color:${c.bd};color:${c.fg}">${status}</span>`; }
 
-/* ================== 대회 목록/필터 ================== */
+/* ===== 대회 목록/필터 ===== */
 let TOURS = {}, TOUR_ARRAY = [];
 async function loadTournaments(){
   const j = await getJSON(apiUrl('tournaments'));
@@ -342,90 +313,49 @@ function renderTourFilter(){
   if(TOUR_ARRAY.find(x=>x.TourID===cur)) sel.value=cur;
 }
 
-/* ================== 팀 표 ================== */
-function jerseySVG(hex, label){
-  const color=(/^#[0-9a-f]{6}$/i).test(hex||'')?hex:'#e5e7eb', text=(label||'').toUpperCase();
-  return `<svg width="42" height="52" viewBox="0 0 42 52" xmlns="http://www.w3.org/2000/svg"><g filter="url(#s)">
-  <path d="M14 3 l4 6 h6 l4-6 h6 v15 l3 3 v27 a3 3 0 0 1 -3 3 h-26 a3 3 0 0 1 -3 -3 v-27 l3-3 v-15 z" fill="${color}" stroke="#cbd5e1"/>
-  <text x="21" y="31" font-family="system-ui,sans-serif" font-size="9" fill="#0f172a" text-anchor="middle" font-weight="700">${text}</text>
-</g><defs><filter id="s" x="0" y="0" width="42" height="52"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity=".08"/></filter></defs></svg>`;
-}
-function normalizeTeamRow(r){
-  const region=[r.시도||r.province||'', r.시군구||r.city||''].join(' ').trim();
-  const cat=r.종별||r.category||'', div=r.디비전||r.division||'';
-  function pickHex(p,f){ if(typeof p==='string' && /^#[0-9a-f]{6}$/i.test(p)) return p.toLowerCase(); if(typeof f==='string'){ const m=f.match(/#([0-9a-f]{6})/i); if(m) return('#'+m[1]).toLowerCase(); } return ''; }
-  const homeHex=pickHex(r.uniformHomeHex, r['유니폼(홈)']), awayHex=pickHex(r.uniformAwayHex, r['유니폼(어웨이)']);
-  return {teamId:r.TeamID||r.teamId||'', tourId:(r.TourID||r.tourId||'').toString().trim(), tourName:r.tourName||r.TourName||r['대회명']||'', region, teamName:r.팀명||r.teamName||'', managerName:r.대표자이름||r.managerName||'', managerPhone:r.대표자연락처||r.managerPhone||'', category:cat, division:div, homeHex, awayHex, createdAt:r.신청일시||r.createdAt||'', editCode:r.수정코드||r.editCode||'' };
-}
-function rowTeam(v){
-  return `<tr><td>${v.teamId}</td><td>${v.tourName||'-'}</td><td>${v.region||'-'}</td>
-  <td><div><b>${v.teamName||''}</b></div><div class="muted">${v.managerName||''} · ${v.managerPhone||''}</div></td>
-  <td>${v.category||''} · ${v.division||''}</td>
-  <td><div class="jersey">${jerseySVG(v.homeHex,'HOME')}${jerseySVG(v.awayHex,'AWAY')}</div></td>
-  <td>${fmtDate(v.createdAt)}</td>
-  <td class="right"><a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a></td></tr>`;
-}
+/* ===== 팀 표 ===== */
+function jerseySVG(hex, label){ const color=(/^#[0-9a-f]{6}$/i).test(hex||'')?hex:'#e5e7eb', text=(label||'').toUpperCase(); return `<svg width="42" height="52" viewBox="0 0 42 52" xmlns="http://www.w3.org/2000/svg"><g filter="url(#s)"><path d="M14 3 l4 6 h6 l4-6 h6 v15 l3 3 v27 a3 3 0 0 1 -3 3 h-26 a3 3 0 0 1 -3 -3 v-27 l3-3 v-15 z" fill="${color}" stroke="#cbd5e1"/><text x="21" y="31" font-family="system-ui,sans-serif" font-size="9" fill="#0f172a" text-anchor="middle" font-weight="700">${text}</text></g><defs><filter id="s" x="0" y="0" width="42" height="52"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity=".08"/></filter></defs></svg>`; }
+function normalizeTeamRow(r){ const region=[r.시도||r.province||'', r.시군구||r.city||''].join(' ').trim(); const cat=r.종별||r.category||'', div=r.디비전||r.division||''; function pickHex(p,f){ if(typeof p==='string' && /^#[0-9a-f]{6}$/i.test(p)) return p.toLowerCase(); if(typeof f==='string'){ const m=f.match(/#([0-9a-f]{6})/i); if(m) return('#'+m[1]).toLowerCase(); } return ''; } const homeHex=pickHex(r.uniformHomeHex, r['유니폼(홈)']), awayHex=pickHex(r.uniformAwayHex, r['유니폼(어웨이)']); return {teamId:r.TeamID||r.teamId||'', tourId:(r.TourID||r.tourId||'').toString().trim(), tourName:r.tourName||r.TourName||r['대회명']||'', region, teamName:r.팀명||r.teamName||'', managerName:r.대표자이름||r.managerName||'', managerPhone:r.대표자연락처||r.managerPhone||'', category:cat, division:div, homeHex, awayHex, createdAt:r.신청일시||r.createdAt||'', editCode:r.수정코드||r.editCode||'' }; }
+function rowTeam(v){ return `<tr><td>${v.teamId}</td><td>${v.tourName||'-'}</td><td>${v.region||'-'}</td><td><div><b>${v.teamName||''}</b></div><div class="muted">${v.managerName||''} · ${v.managerPhone||''}</div></td><td>${v.category||''} · ${v.division||''}</td><td><div class="jersey">${jerseySVG(v.homeHex,'HOME')}${jerseySVG(v.awayHex,'AWAY')}</div></td><td>${fmtDate(v.createdAt)}</td><td class="right"><a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a></td></tr>`; }
 function editUrlFor(teamId, editCode){ const base=APPLY_BASE.replace(/index\.html$/,''); const sep=base.endsWith('/')?'':'/'; return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`; }
-async function loadTeams(){
-  try{
-    const tourId=($('#tourFilter').value||'').trim();
-    const j=await getJSON(apiUrl('teams', tourId?{tourId}:{}) );
-    let rows=Array.isArray(j.rows)?j.rows:[]; if(tourId) rows=rows.filter(r=>String(r.TourID||r.tourId||'').trim()===tourId);
-    const q=($('#searchText').value||'').trim().toLowerCase();
-    if(q){ rows=rows.filter(r=>{ const v=normalizeTeamRow(r); return [v.teamId,v.tourName,v.region,v.teamName,v.managerName,v.managerPhone,v.category,v.division].join(' ').toLowerCase().includes(q); }); }
-    $('#teamsTbody').innerHTML = rows.map(r=>rowTeam(normalizeTeamRow(r))).join('') || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`;
-  }catch(e){ $('#teamsTbody').innerHTML = `<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`; }
-}
+async function loadTeams(){ try{ const tourId=($('#tourFilter').value||'').trim(); const j=await getJSON(apiUrl('teams', tourId?{tourId}:{}) ); let rows=Array.isArray(j.rows)?j.rows:[]; if(tourId) rows=rows.filter(r=>String(r.TourID||r.tourId||'').trim()===tourId); const q=($('#searchText').value||'').trim().toLowerCase(); if(q){ rows=rows.filter(r=>{ const v=normalizeTeamRow(r); return [v.teamId,v.tourName,v.region,v.teamName,v.managerName,v.managerPhone,v.category,v.division].join(' ').toLowerCase().includes(q); }); } $('#teamsTbody').innerHTML = rows.map(r=>rowTeam(normalizeTeamRow(r))).join('') || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`; }catch(e){ $('#teamsTbody').innerHTML = `<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`; } }
 
-/* ================== 종별: 칩만 표시 + 모달로 추가 ================== */
+/* ===== 종별 칩 + 모달 ===== */
 const DIVISION_PRESETS = { '일반부':['D3','D4','D5','D6','D7'], '대학부':['U1','U2','U3','UW'], '여성부':['D3','D4','D5'], '유소년부':['하모니','i1','i2','i3','i4'] };
-
+let DIV_STATE = []; // [{group, divisions}]
 function renderDivChips(container, group, values, editable){
   const row = el(`<div class="place-item"></div>`);
   const left = el(`<div><b>${group}</b></div>`);
   const mid  = el(`<div></div>`);
   const chipBox = el(`<div class="chips"></div>`);
-  if (values.length){
-    chipBox.innerHTML = values.map(v=>`<span class="chip" data-v="${v}" title="${editable?'클릭하여 제거':''}">${v}${editable?' ×':''}</span>`).join('');
-  }else{
-    chipBox.innerHTML = `<span class="muted">미선택</span>`;
-  }
+  chipBox.innerHTML = values.length ? values.map(v=>`<span class="chip" data-v="${v}" title="${editable?'클릭하여 제거':''}">${v}${editable?' ×':''}</span>`).join('') : `<span class="muted">미선택</span>`;
   if (editable){
     chipBox.querySelectorAll('.chip').forEach(c=>{
-      c.addEventListener('click', ()=>{
-        const v=c.getAttribute('data-v');
-        const set = DIV_STATE.find(s=>s.group===group);
-        if (set){ set.divisions = set.divisions.filter(x=>x!==v); DIRTY=true; refreshDivUI(); }
-      });
+      c.addEventListener('click', ()=>{ const v=c.getAttribute('data-v'); const set=DIV_STATE.find(s=>s.group===group); if(set){ set.divisions=set.divisions.filter(x=>x!==v); DIRTY=true; refreshDivUI(); }});
     });
   }
   mid.appendChild(chipBox);
-
   const right = el(`<div class="right"></div>`);
   if (editable){
     const delBtn = el(`<button class="btn danger">삭제</button>`);
-    delBtn.addEventListener('click', ()=>{
-      DIV_STATE = DIV_STATE.filter(s=>s.group!==group);
-      DIRTY=true; refreshDivUI();
-    });
+    delBtn.addEventListener('click', ()=>{ DIV_STATE = DIV_STATE.filter(s=>s.group!==group); DIRTY=true; refreshDivUI(); });
     right.appendChild(delBtn);
   }
-
   row.appendChild(left); row.appendChild(mid);
-  row.appendChild(el(`<div></div>`)); row.appendChild(el(`<div></div>`)); // 자리 맞춤
+  row.appendChild(el(`<div></div>`)); row.appendChild(el(`<div></div>`));
   row.appendChild(right);
   container.appendChild(row);
 }
-
-let DIV_STATE = []; // [{group, divisions}]
 function refreshDivUI(){
   const box = $('#divSetList'); box.innerHTML='';
   const editable = !FORM_LOCKED;
-  DIV_STATE.forEach(s=> renderDivChips(box, s.group, s.divisions||[], editable));
+  if (DIV_STATE.length){
+    DIV_STATE.forEach(s=> renderDivChips(box, s.group, s.divisions||[], editable));
+  }
   $('#addDivSetBtn').disabled = FORM_LOCKED;
 }
 
-/* 모달로 종별 추가 */
+/* 종별 선택 모달 */
 const divModal = $('#divModal'), divGroupSel = $('#divGroupSel'), divChecks = $('#divChecks');
 function openDivModal(){
   if (FORM_LOCKED) return;
@@ -453,30 +383,15 @@ $('#divApplyBtn').addEventListener('click', ()=>{
   closeDivModal(); DIRTY=true; refreshDivUI();
 });
 $('#divCloseBtn').addEventListener('click', closeDivModal);
+$('#addDivSetBtn').addEventListener('click', openDivModal);
 
-/* ================== 주소 검색 팝업 ================== */
+/* ===== 주소 팝업 ===== */
 let addrPickTargetRow = null;
-function computeReturnUrl(){
-  try{
-    const url = new URL(window.location.href);
-    const base = url.origin;
-    let path = url.pathname;
-    if (/\.html?$/i.test(path)) return base + path;
-    if (path.endsWith('/')) return base + path + 'index.html';
-    return base + path + '/index.html';
-  }catch(e){
-    return window.location.origin + '/index.html';
-  }
-}
 function openJusoPopup(targetRow=null){
   if (FORM_LOCKED) return;
   addrPickTargetRow = targetRow;
-const returnUrl = location.origin + '/juso-callback.html';
-const url = 'https://www.juso.go.kr/addrlink/addrLinkUrl.do'
-          + '?confmKey=' + encodeURIComponent(JUSO_KEY)
-          + '&returnUrl=' + encodeURIComponent(returnUrl)
-          + '&resultType=4';
-window.open(url, 'jusoPopup', 'width=570,height=420,scrollbars=yes,resizable=yes');
+  const url = `https://www.juso.go.kr/addrlink/addrLinkUrl.do?confmKey=${encodeURIComponent(JUSO_KEY)}&returnUrl=${encodeURIComponent(JUSO_RETURN)}&resultType=4`;
+  window.open(url,'jusoPopup','width=570,height=420,scrollbars=yes,resizable=yes');
 }
 window.__onJusoSelected = function(d){
   const v = {
@@ -494,7 +409,6 @@ window.__onJusoSelected = function(d){
   DIRTY=true;
   addrPickTargetRow = null;
 };
-
 function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
   const row = el(`<div class="place-item"></div>`);
   const name = el(`<div><label style="margin:0 0 6px">장소명</label><input value="${init.name||''}" data-editable placeholder="예: 서울대학교 종합체육관"></div>`);
@@ -521,7 +435,7 @@ function fillPlaceRow(row,v){
 function getPlaces(){ return [...document.querySelectorAll('#placeList .place-item')].map(it=>it.getValue()).filter(p=>p.name||p.address||(p.lat&&p.lng)); }
 function setPlaces(list){ const box=$('#placeList'); box.innerHTML=''; (list&&list.length?list:[]).forEach(v=> box.appendChild(makePlaceRow(v))); }
 
-/* ================== 폼 상태 관리(잠금/더티) ================== */
+/* ===== 폼 상태(잠금/더티) ===== */
 let FORM_LOCKED = true;
 let DIRTY = false;
 let CURRENT_TOUR_ID = '';
@@ -529,12 +443,9 @@ function setLocked(locked){
   FORM_LOCKED = locked;
   const area = $('#formArea');
   if (locked) area.classList.add('locked'); else area.classList.remove('locked');
-  // 모든 data-editable 요소 활성/비활성
   document.querySelectorAll('[data-editable]').forEach(e => e.disabled = locked);
-  // 관리코드: 포커스 시에만 입력
   const adminInput = $('#adminCode');
   if (locked){ adminInput.setAttribute('readonly',''); } else { adminInput.addEventListener('focus', ()=> adminInput.removeAttribute('readonly'), {once:true}); }
-  // 버튼 상태
   $('#saveTourBtn').disabled = locked;
   $('#deleteTourBtn').disabled = locked || !CURRENT_TOUR_ID;
   $('#addDivSetBtn').disabled = locked;
@@ -550,7 +461,7 @@ async function confirmDiscardIfDirty(){
   return ok;
 }
 
-/* ================== 폼 로드/초기화 ================== */
+/* ===== 폼 로드/초기화 ===== */
 function updateStatusBadge(){ $('#tourStatusBadge').innerHTML = statusBadgeHtml( calcStatus($('#regStart').value||'', $('#regEnd').value||'') ); }
 ['regStart','regEnd'].forEach(id=> $('#'+id).addEventListener('change', updateStatusBadge));
 
@@ -561,14 +472,12 @@ function loadTourToForm(t, locked=true){
   $('#tourName').value = t?.name || '';
   $('#tourUrl').value  = t?.url || '';
 
-  // 문자열 기반으로 값 채우기 (변경/리셋 방지)
   $('#tourStart').value = toInputDateOnly(t?.start);
   $('#tourEnd').value   = toInputDateOnly(t?.end);
   $('#regStart').value  = toInputDT(t?.regStart);
   $('#regEnd').value    = toInputDT(t?.regEnd);
   updateStatusBadge();
 
-  // 종별 (칩 전용)
   let divSets = t?.divSets;
   if (!Array.isArray(divSets) || !divSets.length){
     const m=t?.divs||{}; divSets=Object.keys(m).map(g=>({group:g,divisions:m[g]||[]}));
@@ -576,33 +485,28 @@ function loadTourToForm(t, locked=true){
   DIV_STATE = (divSets||[]).map(s=>({group:s.group, divisions:[...(s.divisions||[])]}));
   refreshDivUI();
 
-  // 장소
   setPlaces(Array.isArray(t?.places)?t.places:[]);
-
-  // 보안
   $('#adminCode').value = '';
   DIRTY = false;
   setLocked(locked);
 }
-
 function clearTourForm(){
   CURRENT_TOUR_ID = '';
   $('#tourFormTitle').textContent = '대회 등록';
   ['tourId','tourName','tourUrl','tourStart','tourEnd','regStart','regEnd','adminCode'].forEach(id=> $('#'+id).value='');
-  DIV_STATE = [{group:'일반부', divisions:[]}];
+  DIV_STATE = [];            // ★ 기본 행 제거
   refreshDivUI();
   setPlaces([]);
   updateStatusBadge();
   DIRTY = false;
-  setLocked(false); // 신규는 편집 가능
+  setLocked(false);          // 신규는 편집 가능
   $('#editBtn').disabled = true;
 }
 
-/* ================== 저장/삭제 ================== */
+/* ===== 저장/삭제 ===== */
 $('#toggleCodeBtn').addEventListener('click', ()=>{
   const i=$('#adminCode'); i.type = i.type==='password' ? 'text' : 'password';
 });
-
 async function saveTournament(){
   const name=($('#tourName').value||'').trim(); if(!name) return alert('대회명을 입력하세요.');
   const adminCode=($('#adminCode').value||'').trim(); if(!adminCode) return alert('관리코드를 입력하세요.');
@@ -621,7 +525,7 @@ async function saveTournament(){
     divSets: DIV_STATE,
     divs,
     places:getPlaces(),
-    adminCode // 신규=설정, 기존=검증
+    adminCode
   };
 
   const j=await postJSON('upsertTournament', payload);
@@ -630,14 +534,13 @@ async function saveTournament(){
   if(j.tourId) $('#tourId').value=j.tourId;
   alert('저장되었습니다.');
   DIRTY=false;
-  setLocked(true); // 저장 후 다시 잠금
+  setLocked(true);
   $('#tourFormTitle').textContent = '대회 수정 (읽기 전용)';
 }
-
 $('#saveTourBtn').addEventListener('click', async ()=>{
+  if (!confirm('저장하시겠습니까?')) return;   // ★ 저장 확인 팝업
   try{ await saveTournament(); }catch(e){ alert('저장 중 오류: '+e.message); }
 });
-
 $('#deleteTourBtn').addEventListener('click', async ()=>{
   const id=($('#tourId').value||'').trim(); if(!id) return alert('삭제할 대회가 선택되지 않았습니다.');
   if(!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
@@ -650,7 +553,7 @@ $('#deleteTourBtn').addEventListener('click', async ()=>{
   }catch(e){ alert('삭제 중 오류: '+e.message); }
 });
 
-/* ================== 상단 버튼/이벤트 ================== */
+/* ===== 상단 버튼/이벤트 ===== */
 $('#settingsBtn').addEventListener('click', ()=>{
   const cur=(conf.appUrl||'').trim();
   const val=prompt('Apps Script Web App URL을 입력하세요:', cur);
@@ -661,33 +564,23 @@ $('#reloadBtn').addEventListener('click', async ()=>{
   if (!(await confirmDiscardIfDirty())) return;
   await health(); await loadTournaments(); await loadTeams();
 });
-
 $('#newTourBtn').addEventListener('click', async ()=>{
   if (!(await confirmDiscardIfDirty())) return;
-  clearTourForm(); // 신규는 편집 가능 상태로
+  clearTourForm();
 });
-
 $('#editBtn').addEventListener('click', ()=>{
   if (!CURRENT_TOUR_ID) return alert('수정할 대회를 먼저 선택하세요.');
   const code = prompt('대회관리 코드를 입력하세요:','');
   if (!code) return;
-  $('#adminCode').value = code; // 저장 시 서버 검증
+  $('#adminCode').value = code;
   setLocked(false);
   $('#tourFormTitle').textContent = '대회 수정 (편집 가능)';
 });
-
-/* 대회 목록 필터/검색 */
-$('#tourFilter').addEventListener('change', async ()=>{
-  if (!(await confirmDiscardIfDirty())){ $('#tourFilter').value=''; return; }
-  loadTeams();
-});
+$('#tourFilter').addEventListener('change', async ()=>{ if (!(await confirmDiscardIfDirty())){ $('#tourFilter').value=''; return; } loadTeams(); });
 $('#searchBtn').addEventListener('click', loadTeams);
 $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
 
-/* 주소 추가 버튼 */
-$('#addPlaceBtn').addEventListener('click', ()=> openJusoPopup(null));
-
-/* 부트 */
+/* ===== 부트 ===== */
 (async function boot(){
   if(!conf.appUrl){ alert('처음 사용이라면 ⚙️에서 Web App URL을 먼저 설정하세요.'); return; }
   await health(); await loadTournaments(); await loadTeams(); updateStatusBadge();
