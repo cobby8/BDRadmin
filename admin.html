@@ -6,7 +6,6 @@
 <title>BDR 관리자</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
-
 <style>
   :root{ --blue:#1769ff; --bg:#f6f8fb; --card:#fff; --muted:#6b7684; --red:#ef4444; --green:#16a34a }
   *{box-sizing:border-box}
@@ -44,21 +43,20 @@
   .help{font-size:12px;color:#6b7280}
   .section-title{font-weight:700;margin:16px 0 6px}
   .subtle{font-size:13px;color:#475569;margin-top:-6px}
-
   .place-item{display:grid;gap:8px;grid-template-columns:1.2fr 2fr .9fr .9fr auto;align-items:center;border:1px solid #e6ecf5;border-radius:12px;padding:10px;background:#fff}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
   .chip{border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;font-size:12px;background:#fff;cursor:pointer}
   .list{display:grid;gap:10px}
   .hr{height:1px;background:#eef2f7;margin:8px 0}
-
-  /* 주소검색 모달 */
-  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:20px;z-index:9999}
-  .modal .panel{background:#fff;width:min(720px,96vw);max-height:90vh;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.18);display:flex;flex-direction:column}
-  .modal .panel header{padding:12px 16px;border-bottom:1px solid #eef2f7}
-  .modal .panel main{padding:12px 16px;overflow:auto}
-  .result{border:1px solid #e6ecf5;border-radius:12px;padding:10px;margin:8px 0;display:grid;gap:6px}
-  .result .title{font-weight:700}
-  .result small{color:#64748b}
+  /* 종별 드롭다운 */
+  .dd{position:relative}
+  .dd-toggle{width:100%}
+  .dd-panel{position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid #e6ecf5;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.12);z-index:1000;padding:10px;min-width:260px;max-width:360px}
+  .dd-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-height:180px;overflow:auto;margin:6px 0}
+  .dd-actions{display:flex;gap:8px;justify-content:flex-end}
+  /* 관리코드 아이콘 */
+  .input-icon{position:relative}
+  .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:16px}
 </style>
 </head>
 <body>
@@ -79,7 +77,7 @@
         <label>대회 필터</label>
         <select id="tourFilter"><option value="">전체 대회</option></select>
       </div>
-      <div class="muted" style="align-self:end">※ ⚙️에서 Apps Script URL과 <b>VWorld API Key</b>를 확인/변경할 수 있습니다.</div>
+      <div class="muted" style="align-self:end">※ ⚙️에서 Apps Script URL과 승인키를 확인/변경할 수 있습니다.</div>
     </div>
   </div>
 
@@ -110,9 +108,9 @@
           <input id="tourUrl" placeholder="안내 페이지 URL (선택)">
         </div>
 
-        <!-- 2) 종별(구분/종별) : 체크박스 다중 추가 -->
+        <!-- 2) 종별(구분/종별) : 드롭다운(체크박스) -->
         <div class="section-title">종별 설정</div>
-        <div class="subtle">구분을 선택하고 <b>종별</b>을 여러 개 체크한 뒤 <b>적용</b>을 누르면 한 번에 추가됩니다. 칩을 클릭하면 제거됩니다.</div>
+        <div class="subtle">구분을 선택하고 <b>종별</b> 드롭다운을 열어 여러 항목을 체크 → 적용하세요. 칩을 클릭하면 제거됩니다.</div>
         <div id="divSetList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px">
           <button class="btn ghost" id="addDivSetBtn">+ 구분/종별 추가</button>
@@ -120,9 +118,9 @@
 
         <div class="hr"></div>
 
-        <!-- 3) 대회장소(복수) : VWorld 주소검색 모달 -->
+        <!-- 3) 대회장소(복수) : 행안부 주소검색 팝업 -->
         <div class="section-title">대회장소</div>
-        <div class="subtle">우측 <b>+ 장소 추가</b>를 누르면 VWorld 주소검색 창이 열립니다. 결과에서 선택하면 행이 자동으로 추가됩니다.</div>
+        <div class="subtle">우측 <b>+ 장소 추가</b>를 누르면 <b>행정안전부 주소검색 팝업</b>이 열립니다. 결과에서 선택하면 행이 추가됩니다.</div>
         <div id="placeList" class="list" style="margin-top:8px"></div>
         <div class="toolbar" style="margin-top:6px;justify-content:flex-end">
           <button class="btn ghost" id="addPlaceBtn">+ 장소 추가</button>
@@ -150,8 +148,11 @@
         <div class="grid grid-2" style="margin-top:12px;align-items:end">
           <div>
             <label>대회관리 코드 (필수)</label>
-            <input id="adminCode" type="password" placeholder="이 대회를 관리할 비밀번호">
-            <div class="help">신규 생성 시 입력한 코드가 설정됩니다. 이후 수정/삭제 시 동일한 코드가 필요합니다.</div>
+            <div class="input-icon">
+              <input id="adminCode" type="password" placeholder="이 대회를 관리할 비밀번호">
+              <button class="eye-btn" id="toggleCodeBtn" title="보기/숨기기">👁️</button>
+            </div>
+            <div class="help">신규 생성 시 설정, 이후 수정/삭제 시 동일 코드 필요.</div>
             <div style="margin-top:8px">
               <label>상태(자동)</label>
               <div id="tourStatusBadge" class="badge">상태미정</div>
@@ -197,31 +198,12 @@
   </div>
 </div>
 
-<!-- 주소검색 모달 (VWorld) -->
-<div class="modal" id="addrModal">
-  <div class="panel">
-    <header style="display:flex;align-items:center;justify-content:space-between">
-      <div style="font-weight:700">주소 검색 (VWorld)</div>
-      <div class="toolbar"><button class="btn" id="addrCloseBtn">닫기</button></div>
-    </header>
-    <main>
-      <div class="grid grid-3" style="margin-bottom:8px">
-        <input id="addrQuery" placeholder="주소/장소명 입력 (예: 서울대 체육관)">
-        <button class="btn" id="addrSearchBtn">검색</button>
-        <div class="muted" id="addrHint" style="align-self:center">최대 10건까지 표시됩니다.</div>
-      </div>
-      <div id="addrResults"></div>
-    </main>
-  </div>
-</div>
-
 <script>
-/* ========= 기본 상수 ========= */
+/* ================== 상수 / 설정 ================== */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 const APPLY_BASE  = 'https://bdrjoin.netlify.app/';
-const DEFAULT_VWORLD_KEY = '85739F39-152F-35BC-9A7F-0EB05AE0EF77';
+const JUSO_KEY    = 'U01TX0FVVEgyMDI1MDkwOTIzNTcyMjExNjE2NDQ='; // 행안부 팝업 API 승인키
 
-/* ========= 로컬 저장 ========= */
 const store = {
   key: 'BDR_ADMIN_CONF',
   load(){ try { return JSON.parse(localStorage.getItem(this.key) || '{}'); } catch { return {} } },
@@ -229,305 +211,185 @@ const store = {
 };
 const conf = store.load();
 if (!conf.appUrl && WEB_APP_URL) { conf.appUrl = WEB_APP_URL; store.save(conf); }
-if (!conf.vwKey) { conf.vwKey = DEFAULT_VWORLD_KEY; store.save(conf); }
 
-/* ========= DOM helpers ========= */
 const $ = s => document.querySelector(s);
 const el = html => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; };
 
-/* ========= 설정 ========= */
-$('#settingsBtn').addEventListener('click', ()=>{
-  const curUrl = (conf.appUrl || '').trim();
-  const valUrl = prompt('Apps Script Web App URL을 입력하세요:', curUrl);
-  if (valUrl === null) return;
-  conf.appUrl = valUrl.trim();
+/* ===== 행안부 팝업 선택 결과(리턴 페이지) 처리 가드 =====
+   팝업의 returnUrl을 이 페이지로 지정해도, 팝업 창 안에서만 실행되고
+   opener.__onJusoSelected(...) 호출 후 즉시 닫힙니다. */
+(function maybeJusoReturn(){
+  const p = new URLSearchParams(location.search);
+  if (p.get('inputYn') === 'Y' && window.opener && window.opener.__onJusoSelected){
+    const data = Object.fromEntries(p.entries());
+    window.opener.__onJusoSelected(data);
+    setTimeout(()=> window.close(), 0);
+  }
+})();
 
-  const vw = prompt('VWorld API Key (변경 시 입력):', conf.vwKey || '');
-  if (vw !== null) conf.vwKey = (vw||'').trim();
-
-  store.save(conf);
-  alert('설정이 저장되었습니다. 새로고침합니다.');
-  location.reload();
-});
-
-/* ========= API ========= */
-function requireAppUrl(){
-  const appUrl = (conf.appUrl || '').trim();
-  if (!appUrl) throw new Error('Web App URL이 설정되지 않았습니다. 우상단 ⚙️를 클릭해 설정하세요.');
-  return appUrl;
-}
+/* ================== 일반 유틸 ================== */
 function apiUrl(path, q={}){
-  const base = requireAppUrl();
-  let u; try { u = new URL(base); } catch(e){ throw new Error('Web App URL이 올바르지 않습니다: ' + base); }
+  const base = (conf.appUrl||'').trim();
+  if (!base) throw new Error('Web App URL이 설정되지 않았습니다. 우상단 ⚙️에서 설정하세요.');
+  let u = new URL(base);
   u.searchParams.set('path', path);
   Object.entries(q).forEach(([k,v])=> u.searchParams.set(k, v));
   return u.toString();
 }
-async function getJSON(u){
-  const r = await fetch(u);
-  if (!r.ok) throw new Error('요청 실패: HTTP ' + r.status);
-  return r.json();
-}
+async function getJSON(u){ const r = await fetch(u); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
 async function postJSON(path, payload){
-  const r = await fetch(apiUrl(path), {
-    method:'POST',
-    headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify(payload||{})
-  });
-  if (!r.ok) throw new Error('요청 실패: HTTP ' + r.status);
+  const r = await fetch(apiUrl(path), { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(payload||{}) });
+  if (!r.ok) throw new Error('HTTP '+r.status);
   return r.json();
 }
-
-/* ========= 헬스 ========= */
 async function health(){
-  try{
-    const j = await getJSON(apiUrl('health'));
-    $('#healthDot').style.color = j.ok ? '#22c55e' : '#ef4444';
-  }catch{
-    $('#healthDot').style.color = '#ef4444';
-  }
+  try{ const j = await getJSON(apiUrl('health')); $('#healthDot').style.color = j.ok ? '#22c55e' : '#ef4444'; }
+  catch{ $('#healthDot').style.color = '#ef4444'; }
 }
-
-/* ========= 유틸 ========= */
+function pad(n){ return String(n).padStart(2,'0'); }
+function toLocalDT(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function toInputDateOnly(src){
+  if(!src) return ''; if(typeof src==='string'){ const m=src.match(/^(\d{4}-\d{2}-\d{2})/); if(m) return m[1]; }
+  const d=new Date(src); if(!isNaN(d)) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; return '';
+}
+function toInputDT(src){
+  if(!src) return ''; if(typeof src==='string'){ const m=src.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/); if(m) return `${m[1]}T${m[2]}:${m[3]}`; }
+  const d=new Date(src); if(!isNaN(d)) return toLocalDT(d); return '';
+}
 function fmtDate(v){
-  if (!v) return '';
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return String(v);
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  const hh = String(d.getHours()).padStart(2,'0');
-  const mi = String(d.getMinutes()).padStart(2,'0');
-  return `${d.getFullYear()}-${mm}-${dd} ${hh}:${mi}`;
+  if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function calcStatus(regStart, regEnd){
   if (!regStart || !regEnd) return '상태미정';
-  const now = new Date();
-  const s = new Date(regStart);
-  const e = new Date(regEnd);
-  if (isNaN(s.getTime()) || isNaN(e.getTime())) return '상태미정';
-  if (now < s) return '접수전';
-  if (now > e) return '마감';
-  return '접수중';
+  const s=new Date(regStart), e=new Date(regEnd), now=new Date();
+  if(isNaN(s)||isNaN(e)) return '상태미정';
+  if(now<s) return '접수전'; if(now>e) return '마감'; return '접수중';
 }
 function statusBadgeHtml(status){
-  const map = {
-    '접수중': {bg:'#ecfdf5', bd:'#d1fae5', fg:'#16a34a'},
-    '접수전': {bg:'#eff6ff', bd:'#dbeafe', fg:'#1769ff'},
-    '마감':   {bg:'#fef2f2', bd:'#fee2e2', fg:'#ef4444'},
-    '상태미정': {bg:'#f1f5fb', bd:'#e4ecf7', fg:'#334155'}
-  };
-  const c = map[status] || map['상태미정'];
+  const c={ '접수중':{bg:'#ecfdf5',bd:'#d1fae5',fg:'#16a34a'}, '접수전':{bg:'#eff6ff',bd:'#dbeafe',fg:'#1769ff'}, '마감':{bg:'#fef2f2',bd:'#fee2e2',fg:'#ef4444'}, '상태미정':{bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'} }[status] || {bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'};
   return `<span class="badge" style="background:${c.bg};border-color:${c.bd};color:${c.fg}">${status}</span>`;
 }
-function stripTags(s=''){ return s.replace(/<[^>]+>/g,''); }
 
-/* ========= 대회 목록/필터 ========= */
-let TOURS = {};
-let TOUR_ARRAY = [];
+/* ================== 대회 목록/필터 ================== */
+let TOURS = {}, TOUR_ARRAY = [];
 async function loadTournaments(){
   const j = await getJSON(apiUrl('tournaments'));
   TOURS = {}; TOUR_ARRAY = j.rows || [];
   TOUR_ARRAY.forEach(t => TOURS[t.TourID] = t);
-  renderTournamentList();
-  renderTourFilter();
-}
-function renderTourFilter(){
-  const sel = $('#tourFilter');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">전체 대회</option>';
-  TOUR_ARRAY.forEach(t=>{
-    const o = document.createElement('option');
-    o.value = t.TourID; o.textContent = t.name;
-    sel.appendChild(o);
-  });
-  if (TOUR_ARRAY.find(x=>x.TourID===cur)) sel.value = cur;
-}
-function tourCard(t){
-  const range = (t.start||t.end) ? `${fmtDate(t.start)} ~ ${fmtDate(t.end)}` : '일정미정';
-  const stat = calcStatus(t.regStart, t.regEnd);
-  return `<div class="pill" data-id="${t.TourID}"><b>${t.name}</b> · ${stat} · ${range}</div>`;
+  renderTournamentList(); renderTourFilter();
 }
 function renderTournamentList(){
   const box = $('#tourList');
-  box.innerHTML = (TOUR_ARRAY||[]).map(t=>tourCard(t)).join('');
-  box.querySelectorAll('.pill').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const t = TOURS[el.dataset.id];
-      loadTourToForm(t);
-    });
-  });
+  box.innerHTML = (TOUR_ARRAY||[]).map(t=>{
+    const range = (t.start||t.end) ? `${fmtDate(t.start)} ~ ${fmtDate(t.end)}` : '일정미정';
+    const stat = calcStatus(t.regStart, t.regEnd);
+    return `<div class="pill" data-id="${t.TourID}"><b>${t.name}</b> · ${stat} · ${range}</div>`;
+  }).join('');
+  box.querySelectorAll('.pill').forEach(el=> el.addEventListener('click', ()=> loadTourToForm(TOURS[el.dataset.id])));
+}
+function renderTourFilter(){
+  const sel=$('#tourFilter'); const cur=sel.value;
+  sel.innerHTML='<option value="">전체 대회</option>';
+  TOUR_ARRAY.forEach(t=>{ const o=document.createElement('option'); o.value=t.TourID; o.textContent=t.name; sel.appendChild(o); });
+  if(TOUR_ARRAY.find(x=>x.TourID===cur)) sel.value=cur;
 }
 
-/* ========= 팀 표 ========= */
+/* ================== 팀 표 ================== */
 function jerseySVG(hex, label){
-  const color = (/^#[0-9a-f]{6}$/i).test(hex||'') ? hex : '#e5e7eb';
-  const text = (label||'').toUpperCase();
-  return `
-  <svg width="42" height="52" viewBox="0 0 42 52" xmlns="http://www.w3.org/2000/svg">
-    <g filter="url(#s)">
-      <path d="M14 3 l4 6 h6 l4-6 h6 v15 l3 3 v27 a3 3 0 0 1 -3 3 h-26 a3 3 0 0 1 -3 -3 v-27 l3-3 v-15 z"
-            fill="${color}" stroke="#cbd5e1" />
-      <text x="21" y="31" font-family="system-ui, sans-serif" font-size="9" fill="#0f172a" text-anchor="middle" font-weight="700">${text}</text>
-    </g>
-    <defs>
-      <filter id="s" x="0" y="0" width="42" height="52">
-        <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity=".08"/>
-      </filter>
-    </defs>
-  </svg>`;
+  const color=(/^#[0-9a-f]{6}$/i).test(hex||'')?hex:'#e5e7eb', text=(label||'').toUpperCase();
+  return `<svg width="42" height="52" viewBox="0 0 42 52" xmlns="http://www.w3.org/2000/svg"><g filter="url(#s)">
+  <path d="M14 3 l4 6 h6 l4-6 h6 v15 l3 3 v27 a3 3 0 0 1 -3 3 h-26 a3 3 0 0 1 -3 -3 v-27 l3-3 v-15 z" fill="${color}" stroke="#cbd5e1"/>
+  <text x="21" y="31" font-family="system-ui,sans-serif" font-size="9" fill="#0f172a" text-anchor="middle" font-weight="700">${text}</text>
+</g><defs><filter id="s" x="0" y="0" width="42" height="52"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity=".08"/></filter></defs></svg>`;
 }
 function normalizeTeamRow(r){
-  const region = [r.시도 || r.province || '', r.시군구 || r.city || ''].join(' ').trim();
-  const cat    = r.종별 || r.category || '';
-  const div    = r.디비전 || r.division || '';
-  function pickHex(primary, fallback){
-    if (typeof primary === 'string' && /^#[0-9a-f]{6}$/i.test(primary)) return primary.toLowerCase();
-    if (typeof fallback === 'string'){
-      const m = fallback.match(/#([0-9a-f]{6})/i);
-      if (m) return ('#' + m[1]).toLowerCase();
-    }
-    return '';
-  }
-  const homeHex = pickHex(r.uniformHomeHex, r['유니폼(홈)']);
-  const awayHex = pickHex(r.uniformAwayHex, r['유니폼(어웨이)']);
-  return {
-    teamId:       r.TeamID || r.teamId || '',
-    tourId:       (r.TourID || r.tourId || '').toString().trim(),
-    tourName:     r.tourName || r.TourName || r['대회명'] || '',
-    region,
-    teamName:     r.팀명 || r.teamName || '',
-    managerName:  r.대표자이름 || r.managerName || '',
-    managerPhone: r.대표자연락처 || r.managerPhone || '',
-    category:     cat,
-    division:     div,
-    homeHex,
-    awayHex,
-    createdAt:    r.신청일시 || r.createdAt || '',
-    editCode:     r.수정코드 || r.editCode || ''
-  };
+  const region=[r.시도||r.province||'', r.시군구||r.city||''].join(' ').trim();
+  const cat=r.종별||r.category||'', div=r.디비전||r.division||'';
+  function pickHex(p,f){ if(typeof p==='string' && /^#[0-9a-f]{6}$/i.test(p)) return p.toLowerCase(); if(typeof f==='string'){ const m=f.match(/#([0-9a-f]{6})/i); if(m) return('#'+m[1]).toLowerCase(); } return ''; }
+  const homeHex=pickHex(r.uniformHomeHex, r['유니폼(홈)']), awayHex=pickHex(r.uniformAwayHex, r['유니폼(어웨이)']);
+  return {teamId:r.TeamID||r.teamId||'', tourId:(r.TourID||r.tourId||'').toString().trim(), tourName:r.tourName||r.TourName||r['대회명']||'', region, teamName:r.팀명||r.teamName||'', managerName:r.대표자이름||r.managerName||'', managerPhone:r.대표자연락처||r.managerPhone||'', category:cat, division:div, homeHex, awayHex, createdAt:r.신청일시||r.createdAt||'', editCode:r.수정코드||r.editCode||'' };
 }
 function rowTeam(v){
-  return `
-    <tr>
-      <td>${v.teamId}</td>
-      <td>${v.tourName || '-'}</td>
-      <td>${v.region || '-'}</td>
-      <td>
-        <div><b>${v.teamName || ''}</b></div>
-        <div class="muted">${v.managerName || ''} · ${v.managerPhone || ''}</div>
-      </td>
-      <td>${v.category || ''} · ${v.division || ''}</td>
-      <td><div class="jersey">${jerseySVG(v.homeHex,'HOME')}${jerseySVG(v.awayHex,'AWAY')}</div></td>
-      <td>${fmtDate(v.createdAt)}</td>
-      <td class="right"><a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a></td>
-    </tr>`;
+  return `<tr><td>${v.teamId}</td><td>${v.tourName||'-'}</td><td>${v.region||'-'}</td>
+  <td><div><b>${v.teamName||''}</b></div><div class="muted">${v.managerName||''} · ${v.managerPhone||''}</div></td>
+  <td>${v.category||''} · ${v.division||''}</td>
+  <td><div class="jersey">${jerseySVG(v.homeHex,'HOME')}${jerseySVG(v.awayHex,'AWAY')}</div></td>
+  <td>${fmtDate(v.createdAt)}</td>
+  <td class="right"><a class="btn" href="${editUrlFor(v.teamId, v.editCode)}" target="_blank" rel="noopener">수정 열기</a></td></tr>`;
 }
-function editUrlFor(teamId, editCode) {
-  const base = APPLY_BASE.replace(/index\.html$/,'');
-  const sep = base.endsWith('/') ? '' : '/';
-  return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`;
-}
+function editUrlFor(teamId, editCode){ const base=APPLY_BASE.replace(/index\.html$/,''); const sep=base.endsWith('/')?'':'/'; return `${base}${sep}?edit=${encodeURIComponent(teamId)}&code=${encodeURIComponent(editCode||'')}`; }
 async function loadTeams(){
   try{
-    const tourId = ($('#tourFilter').value||'').trim();
-    const j = await getJSON(apiUrl('teams', tourId ? { tourId } : {}));
-    let rows = Array.isArray(j.rows) ? j.rows : [];
-    if (tourId) rows = rows.filter(r => String(r.TourID||r.tourId||'').trim() === tourId);
-    const q = ($('#searchText').value||'').trim().toLowerCase();
-    if (q){
-      rows = rows.filter(r=>{
-        const v = normalizeTeamRow(r);
-        const blob = [
-          v.teamId, v.tourName, v.region, v.teamName,
-          v.managerName, v.managerPhone, v.category, v.division
-        ].join(' ').toLowerCase();
-        return blob.includes(q);
-      });
-    }
-    const html = rows.map(r => rowTeam(normalizeTeamRow(r))).join('');
-    $('#teamsTbody').innerHTML = html || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`;
-  }catch(e){
-    $('#teamsTbody').innerHTML = `<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`;
-  }
+    const tourId=($('#tourFilter').value||'').trim();
+    const j=await getJSON(apiUrl('teams', tourId?{tourId}:{}) );
+    let rows=Array.isArray(j.rows)?j.rows:[]; if(tourId) rows=rows.filter(r=>String(r.TourID||r.tourId||'').trim()===tourId);
+    const q=($('#searchText').value||'').trim().toLowerCase();
+    if(q){ rows=rows.filter(r=>{ const v=normalizeTeamRow(r); return [v.teamId,v.tourName,v.region,v.teamName,v.managerName,v.managerPhone,v.category,v.division].join(' ').toLowerCase().includes(q); }); }
+    $('#teamsTbody').innerHTML = rows.map(r=>rowTeam(normalizeTeamRow(r))).join('') || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`;
+  }catch(e){ $('#teamsTbody').innerHTML = `<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`; }
 }
 
-/* ========= 종별(구분/종별) : 체크박스 ========= */
-const DIVISION_PRESETS = {
-  '일반부': ['D3','D4','D5','D6','D7'],
-  '대학부': ['U1','U2','U3','UW'],
-  '여성부': ['D3','D4','D5'],
-  '유소년부': ['하모니','i1','i2','i3','i4']
-};
+/* ================== 종별(구분/종별): 드롭다운 체크박스 ================== */
+const DIVISION_PRESETS = { '일반부':['D3','D4','D5','D6','D7'], '대학부':['U1','U2','U3','UW'], '여성부':['D3','D4','D5'], '유소년부':['하모니','i1','i2','i3','i4'] };
+
 function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   const row = el(`<div class="place-item"></div>`);
 
   // 구분
   const groupWrap = el(`<div><label style="margin:0 0 6px">구분</label></div>`);
-  const groupSel = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
+  const groupSel  = el(`<select class="groupSel">${Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('')}</select>`);
   groupWrap.appendChild(groupSel);
 
-  // 종별(체크박스) + 적용
-  const catsWrap = el(`<div><label style="margin:0 0 6px">종별</label></div>`);
-  const catsBox = el(`<div class="chips" style="gap:12px"></div>`);
-  const applyBtn = el(`<button class="btn">적용</button>`);
-  const catContainer = el(`<div style="display:flex;gap:12px;align-items:center"></div>`);
-  catContainer.appendChild(catsBox);
-  catContainer.appendChild(applyBtn);
-  catsWrap.appendChild(catContainer);
+  // 종별 드롭다운(체크박스)
+  const ddWrap = el(`<div><label style="margin:0 0 6px">종별</label></div>`);
+  const dd     = el(`<div class="dd"></div>`);
+  const ddBtn  = el(`<button class="btn dd-toggle" type="button">종별 선택 ▾</button>`);
+  const panel  = el(`<div class="dd-panel" style="display:none"></div>`);
+  const listBox= el(`<div class="dd-row"></div>`);
+  const actions= el(`<div class="dd-actions"><button class="btn" data-apply>적용</button><button class="btn" data-close>닫기</button></div>`);
+  panel.appendChild(listBox); panel.appendChild(actions); dd.appendChild(ddBtn); dd.appendChild(panel); ddWrap.appendChild(dd);
+
+  function renderCheckboxes(){
+    const opts=DIVISION_PRESETS[groupSel.value]||[];
+    listBox.innerHTML=opts.map(v=>{
+      const id='cb_'+groupSel.value+'_'+v+'_'+Math.random().toString(36).slice(2,7);
+      return `<label style="display:flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px"><input type="checkbox" value="${v}" id="${id}"><span>${v}</span></label>`;
+    }).join('');
+  }
+  function openPanel(){ panel.style.display='block'; document.addEventListener('click', outsideClose, {once:true}); }
+  function closePanel(){ panel.style.display='none'; }
+  function outsideClose(ev){ if(!panel.contains(ev.target) && ev.target!==ddBtn) closePanel(); }
+
+  ddBtn.addEventListener('click', (e)=>{ e.stopPropagation(); panel.style.display==='none'?openPanel():closePanel(); });
+  panel.querySelector('[data-close]').addEventListener('click', closePanel);
 
   // 선택 결과 칩
   const tags = el(`<div><label style="margin:0 0 6px">선택 결과</label><div class="chips"></div></div>`);
   const chipsBox = tags.querySelector('.chips');
+  let values = Array.from(init.divisions||[]);
+  function refreshChips(){
+    chipsBox.innerHTML = values.length ? values.map(v=>`<span class="chip" data-v="${v}" title="클릭하여 제거">${v} ×</span>`).join('') : '<span class="muted" style="padding:6px 0">미선택</span>';
+    chipsBox.querySelectorAll('.chip').forEach(c=> c.addEventListener('click',()=>{ const v=c.getAttribute('data-v'); values=values.filter(x=>x!==v); refreshChips(); }) );
+  }
+  panel.querySelector('[data-apply]').addEventListener('click', ()=>{
+    const checked=[...panel.querySelectorAll('input[type="checkbox"]:checked')].map(i=>i.value);
+    checked.forEach(v=>{ if(!values.includes(v)) values.push(v); });
+    panel.querySelectorAll('input[type="checkbox"]').forEach(i=> i.checked=false);
+    refreshChips(); closePanel();
+  });
 
   // 삭제 버튼
-  const del = el(`<div style="display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">
-    <button class="btn danger">삭제</button>
-  </div>`);
+  const del = el(`<div style="display:flex;align-items:flex-end;gap:8px;justify-content:flex-end"><button class="btn danger">삭제</button></div>`);
   del.querySelector('button').addEventListener('click', ()=> row.remove());
-
-  // 내부 상태
-  let values = Array.from(init.divisions || []);
-
-  function renderCheckboxes(group){
-    const opts = DIVISION_PRESETS[group];
-    catsBox.innerHTML = opts.map(v=>{
-      const id = 'cb_'+group+'_'+v+'_'+Math.random().toString(36).slice(2,7);
-      return `<label style="display:flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px">
-        <input type="checkbox" value="${v}" id="${id}"><span>${v}</span>
-      </label>`;
-    }).join('');
-  }
-  function refreshChips(){
-    chipsBox.innerHTML = values.length
-      ? values.map(v=>`<span class="chip" data-v="${v}" title="클릭하여 제거">${v} ×</span>`).join('')
-      : '<span class="muted" style="padding:6px 0">미선택</span>';
-    chipsBox.querySelectorAll('.chip').forEach(c=>{
-      c.addEventListener('click', ()=>{
-        const v = c.getAttribute('data-v');
-        values = values.filter(x=>x!==v);
-        refreshChips();
-      });
-    });
-  }
-  function applyChecked(){
-    const checked = [...catsBox.querySelectorAll('input[type="checkbox"]:checked')].map(i=>i.value);
-    checked.forEach(v=>{ if (!values.includes(v)) values.push(v); });
-    // 체크 해제
-    catsBox.querySelectorAll('input[type="checkbox"]').forEach(i=> i.checked=false);
-    refreshChips();
-  }
-
-  groupSel.addEventListener('change', ()=> renderCheckboxes(groupSel.value));
-  applyBtn.addEventListener('click', applyChecked);
 
   // 초기화
   groupSel.value = init.group || '일반부';
-  renderCheckboxes(groupSel.value);
-  refreshChips();
+  renderCheckboxes(); refreshChips();
+  groupSel.addEventListener('change', renderCheckboxes);
 
-  // 조립
   row.appendChild(groupWrap);
-  row.appendChild(catsWrap);
+  row.appendChild(ddWrap);
   row.appendChild(tags);
   row.appendChild(el('<div></div>'));
   row.appendChild(del);
@@ -535,269 +397,160 @@ function makeDivSetRow(init={ group:'일반부', divisions:[] }){
   row.getValue = ()=>({ group: groupSel.value, divisions: values.slice() });
   return row;
 }
-function getDivSets(){
-  return [...document.querySelectorAll('#divSetList .place-item')].map(it => it.getValue());
-}
-function setDivSets(list){
-  const box = $('#divSetList'); box.innerHTML = '';
-  (list && list.length ? list : [{group:'일반부', divisions:[]}]).forEach(v=>{
-    box.appendChild(makeDivSetRow(v));
-  });
-}
+function getDivSets(){ return [...document.querySelectorAll('#divSetList .place-item')].map(it=>it.getValue()); }
+function setDivSets(list){ const box=$('#divSetList'); box.innerHTML=''; (list&&list.length?list:[{group:'일반부',divisions:[]}]).forEach(v=> box.appendChild(makeDivSetRow(v))); }
 $('#addDivSetBtn').addEventListener('click', ()=> $('#divSetList').appendChild(makeDivSetRow()) );
 
-/* ========= VWorld 주소검색 모달 ========= */
-let addrPickTargetRow = null; // 특정 행 갱신용, null이면 새 행 추가
-function openAddrModal(targetRow=null){
+/* ================== 행안부 주소검색 팝업 ================== */
+let addrPickTargetRow = null;
+function openJusoPopup(targetRow=null){
   addrPickTargetRow = targetRow;
-  $('#addrQuery').value = '';
-  $('#addrResults').innerHTML = '';
-  $('#addrModal').style.display = 'flex';
-  setTimeout(()=> $('#addrQuery').focus(), 0);
+  const returnUrl = location.origin + location.pathname; // 이 페이지가 콜백 처리
+  const url = `https://www.juso.go.kr/addrlink/addrLinkUrl.do?confmKey=${encodeURIComponent(JUSO_KEY)}&returnUrl=${encodeURIComponent(returnUrl)}&resultType=4`;
+  window.open(url,'jusoPopup','width=570,height=420,scrollbars=yes,resizable=yes');
 }
-function closeAddrModal(){ $('#addrModal').style.display = 'none'; addrPickTargetRow = null; }
-$('#addrCloseBtn').addEventListener('click', closeAddrModal);
-document.getElementById('addrModal').addEventListener('click', (e)=>{
-  if (e.target.id === 'addrModal') closeAddrModal();
-});
-document.addEventListener('keydown', (e)=>{
-  if (e.key==='Escape' && $('#addrModal').style.display==='flex') closeAddrModal();
-});
-
-async function vworldSearch(q){
-  const key = conf.vwKey;
-  if (!key) return [];
-  const u = new URL('https://api.vworld.kr/req/search');
-  u.searchParams.set('service','search');
-  u.searchParams.set('request','search');
-  u.searchParams.set('version','2.0');
-  u.searchParams.set('size','10');
-  u.searchParams.set('page','1');
-  u.searchParams.set('query', q);
-  u.searchParams.set('type','place');     // 장소명 우선
-  u.searchParams.set('format','json');
-  u.searchParams.set('key', key);
-  const r = await fetch(u.toString());
-  const j = await r.json();
-  const items = j?.response?.result?.[0]?.items || [];
-  return items.map(it=>{
-    const name = stripTags(it.title||'');
-    const road = it.address?.road || '';
-    const parcel = it.address?.parcel || '';
-    const x = parseFloat(it.point?.x), y = parseFloat(it.point?.y);
-    return { name, road, parcel, lat:y, lng:x };
-  }).filter(v=> isFinite(v.lat) && isFinite(v.lng));
-}
-async function addrSearch(){
-  const q = $('#addrQuery').value.trim();
-  if (!q) { alert('검색어를 입력하세요.'); return; }
-  try{
-    const list = await vworldSearch(q);
-    if (!list.length){
-      $('#addrResults').innerHTML = '<div class="muted">검색 결과가 없습니다.</div>';
-      return;
-    }
-    $('#addrResults').innerHTML = list.map((v,i)=>`
-      <div class="result" data-i="${i}">
-        <div class="title">${v.name||'(이름 없음)'}</div>
-        <small>${v.road || v.parcel || ''}</small>
-        <small>좌표: ${v.lat.toFixed(6)}, ${v.lng.toFixed(6)}</small>
-        <div class="right"><button class="btn" data-pick="${i}">선택</button></div>
-      </div>
-    `).join('');
-    // 선택 이벤트
-    $('#addrResults').querySelectorAll('[data-pick]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const i = parseInt(btn.getAttribute('data-pick'));
-        applyAddress(list[i]);
-      });
-    });
-  }catch(e){
-    alert('검색 오류: ' + e.message);
-  }
-}
-$('#addrSearchBtn').addEventListener('click', addrSearch);
-$('#addrQuery').addEventListener('keydown', e=>{ if(e.key==='Enter') addrSearch(); });
-
-function applyAddress(v){
+window.__onJusoSelected = function(d){
+  // d.roadAddr / d.roadAddrPart1 / d.roadAddrPart2 / d.bdNm / d.entX(경도) / d.entY(위도) …
+  const v = {
+    name: d.bdNm || d.roadAddr || d.roadAddrPart1 || '',
+    address: d.roadAddr || [d.roadAddrPart1||'', d.roadAddrPart2||''].join(' ').trim(),
+    lat: parseFloat(d.entY||''),
+    lng: parseFloat(d.entX||'')
+  };
   if (addrPickTargetRow){
-    // 기존 행 갱신
     fillPlaceRow(addrPickTargetRow, v);
   }else{
-    // 새 행 추가
     const row = makePlaceRow({});
     $('#placeList').appendChild(row);
     fillPlaceRow(row, v);
   }
-  closeAddrModal();
-}
+  addrPickTargetRow = null;
+};
 
-/* 장소 행(재검색 지원) */
 function makePlaceRow(init={ name:'', address:'', lat:'', lng:'' }){
   const row = el(`<div class="place-item"></div>`);
-  const name = el(`<div><label style="margin:0 0 6px">장소명</label><input placeholder="예: 서울대학교 종합체육관" value="${init.name||''}"></div>`);
-  const addr = el(`<div><label style="margin:0 0 6px">주소</label><input placeholder="검색으로 입력하세요" value="${init.address||''}"></div>`);
-  const lat  = el(`<div><label style="margin:0 0 6px">위도</label><input placeholder="37.xxxxxx" value="${init.lat||''}"></div>`);
-  const lng  = el(`<div><label style="margin:0 0 6px">경도</label><input placeholder="126.xxxxxx" value="${init.lng||''}"></div>`);
-  const ctrl = el(`<div style="display:flex;gap:6px;align-items:flex-end">
-    <button class="btn" data-research>재검색</button>
-    <button class="btn danger" data-del>삭제</button>
-  </div>`);
-  ctrl.querySelector('[data-research]').addEventListener('click', ()=> openAddrModal(row));
+  const name = el(`<div><label style="margin:0 0 6px">장소명</label><input value="${init.name||''}" placeholder="예: 서울대학교 종합체육관"></div>`);
+  const addr = el(`<div><label style="margin:0 0 6px">주소</label><input value="${init.address||''}" placeholder="팝업으로 입력하세요"></div>`);
+  const lat  = el(`<div><label style="margin:0 0 6px">위도</label><input value="${init.lat||''}" placeholder="37.xxxxxx"></div>`);
+  const lng  = el(`<div><label style="margin:0 0 6px">경도</label><input value="${init.lng||''}" placeholder="126.xxxxxx"></div>`);
+  const ctrl = el(`<div style="display:flex;gap:6px;align-items:flex-end"><button class="btn" data-research>재검색</button><button class="btn danger" data-del>삭제</button></div>`);
+  ctrl.querySelector('[data-research]').addEventListener('click', ()=> openJusoPopup(row));
   ctrl.querySelector('[data-del]').addEventListener('click', ()=> row.remove());
-
   row.appendChild(name); row.appendChild(addr); row.appendChild(lat); row.appendChild(lng); row.appendChild(ctrl);
-
-  row.getValue = ()=>({
-    name: name.querySelector('input').value.trim(),
-    address: addr.querySelector('input').value.trim(),
-    lat: parseFloat(lat.querySelector('input').value),
-    lng: parseFloat(lng.querySelector('input').value)
-  });
-  row.setValues = (v)=> fillPlaceRow(row, v);
+  row.getValue = ()=>({ name:name.querySelector('input').value.trim(), address:addr.querySelector('input').value.trim(), lat:parseFloat(lat.querySelector('input').value), lng:parseFloat(lng.querySelector('input').value) });
   return row;
 }
-function fillPlaceRow(row, v){
+function fillPlaceRow(row,v){
   const [nameI, addrI, latI, lngI] = row.querySelectorAll('input');
-  nameI.value = v.name || nameI.value;
-  addrI.value = (v.road || v.parcel || v.address || addrI.value || '');
+  if (v.name) nameI.value = v.name;
+  if (v.address) addrI.value = v.address;
   if (isFinite(v.lat)) latI.value = Number(v.lat).toFixed(6);
   if (isFinite(v.lng)) lngI.value = Number(v.lng).toFixed(6);
 }
-function getPlaces(){ return [...document.querySelectorAll('#placeList .place-item')].map(it => it.getValue()); }
+function getPlaces(){ return [...document.querySelectorAll('#placeList .place-item')].map(it=>it.getValue()).filter(p=>p.name||p.address||(p.lat&&p.lng)); }
 function setPlaces(list){ const box=$('#placeList'); box.innerHTML=''; (list&&list.length?list:[]).forEach(v=> box.appendChild(makePlaceRow(v))); }
+$('#addPlaceBtn').addEventListener('click', ()=> openJusoPopup(null));
 
-/* ========= 폼 로드/초기화 ========= */
-function toLocalDT(d){
-  const pad=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function updateStatusBadge(){
-  const s = $('#regStart').value || '';
-  const e = $('#regEnd').value || '';
-  const st = calcStatus(s, e);
-  $('#tourStatusBadge').innerHTML = statusBadgeHtml(st);
-}
+/* ================== 폼 로드/초기화 ================== */
+function updateStatusBadge(){ $('#tourStatusBadge').innerHTML = statusBadgeHtml( calcStatus($('#regStart').value||'', $('#regEnd').value||'') ); }
 ['regStart','regEnd'].forEach(id=> $('#'+id).addEventListener('change', updateStatusBadge));
 
 function loadTourToForm(t){
   $('#tourFormTitle').textContent = '대회 수정';
-  $('#tourId').value = t.TourID || '';
+  $('#tourId').value   = t.TourID || '';
   $('#tourName').value = t.name || '';
-  $('#tourUrl').value = t.url || '';
-  $('#tourStart').valueAsDate = t.start ? new Date(t.start) : null;
-  $('#tourEnd').valueAsDate   = t.end ? new Date(t.end) : null;
+  $('#tourUrl').value  = t.url || '';
 
-  const regS = t.regStart ? new Date(t.regStart) : null;
-  const regE = t.regEnd   ? new Date(t.regEnd)   : null;
-  $('#regStart').value = regS ? toLocalDT(regS) : '';
-  $('#regEnd').value   = regE ? toLocalDT(regE) : '';
+  // 날짜/시간 안전 파싱 (리셋 방지)
+  $('#tourStart').value = toInputDateOnly(t.start);
+  $('#tourEnd').value   = toInputDateOnly(t.end);
+  $('#regStart').value  = toInputDT(t.regStart);
+  $('#regEnd').value    = toInputDT(t.regEnd);
   updateStatusBadge();
 
+  // 종별
   let divSets = t.divSets;
   if (!Array.isArray(divSets) || !divSets.length){
-    const m = t.divs || {};
-    divSets = Object.keys(m).map(g=>({ group:g, divisions: m[g]||[] }));
+    const m=t.divs||{}; divSets=Object.keys(m).map(g=>({group:g,divisions:m[g]||[]}));
   }
   setDivSets(divSets);
 
-  setPlaces(Array.isArray(t.places)? t.places : []);
-  $('#adminCode').value = ''; // 보안상 불러오지 않음
+  // 장소
+  setPlaces(Array.isArray(t.places)?t.places:[]);
+
+  // 보안
+  $('#adminCode').value = ''; // 보안상 미리 채우지 않음
 }
 function clearTourForm(){
   $('#tourFormTitle').textContent = '대회 등록';
-  ['tourId','tourName','tourUrl','tourStart','tourEnd','regStart','regEnd','adminCode'].forEach(id=> $('#'+id).value = '');
-  setDivSets([{group:'일반부', divisions:[]}]);
+  ['tourId','tourName','tourUrl','tourStart','tourEnd','regStart','regEnd','adminCode'].forEach(id=> $('#'+id).value='');
+  setDivSets([{group:'일반부',divisions:[]}]);
   setPlaces([]);
   updateStatusBadge();
 }
 
-/* ========= 저장/삭제 (관리코드 필수) ========= */
-$('#newTourBtn').addEventListener('click', clearTourForm);
+/* ================== 저장/삭제 (관리코드) ================== */
+$('#toggleCodeBtn').addEventListener('click', ()=>{
+  const i=$('#adminCode'); i.type = i.type==='password' ? 'text' : 'password';
+});
 
 async function saveTournament(){
-  const name = ($('#tourName').value||'').trim();
-  if (!name) return alert('대회명을 입력하세요.');
-  const adminCode = ($('#adminCode').value||'').trim();
-  if (!adminCode) return alert('관리코드를 입력하세요.');
+  const name=($('#tourName').value||'').trim(); if(!name) return alert('대회명을 입력하세요.');
+  const adminCode=($('#adminCode').value||'').trim(); if(!adminCode) return alert('관리코드를 입력하세요.');
 
-  const divSets = getDivSets().map(s=>({ group:s.group, divisions:(s.divisions||[]) }));
-  const divs = {};
-  divSets.forEach(s=>{
-    if (!divs[s.group]) divs[s.group] = [];
-    (s.divisions||[]).forEach(d=>{ if (!divs[s.group].includes(d)) divs[s.group].push(d); });
-  });
+  const divSets=getDivSets().map(s=>({group:s.group,divisions:(s.divisions||[])}));
+  const divs={}; divSets.forEach(s=>{ if(!divs[s.group]) divs[s.group]=[]; (s.divisions||[]).forEach(d=>{ if(!divs[s.group].includes(d)) divs[s.group].push(d); }); });
 
-  const places = getPlaces().filter(p=> p.name || p.address || (p.lat && p.lng));
-  const regStart = $('#regStart').value || '';
-  const regEnd   = $('#regEnd').value   || '';
-  const status   = calcStatus(regStart, regEnd); // 자동 계산
-
-  const payload = {
-    tourId: ($('#tourId').value || '').trim(),
+  const payload={
+    tourId:($('#tourId').value||'').trim(),
     name,
     start: $('#tourStart').value || '',
-    end: $('#tourEnd').value || '',
-    regStart, regEnd,
-    status,
-    url: ($('#tourUrl').value || '').trim(),
-    divSets,
-    divs,
-    places,
-    adminCode // ★ 항상 전송: 신규=설정, 기존=검증
+    end:   $('#tourEnd').value   || '',
+    regStart: $('#regStart').value || '',
+    regEnd:   $('#regEnd').value   || '',
+    status:   calcStatus($('#regStart').value||'', $('#regEnd').value||''),
+    url:($('#tourUrl').value||'').trim(),
+    divSets, divs,
+    places:getPlaces(),
+    adminCode // 신규=설정, 기존=검증
   };
 
-  const j = await postJSON('upsertTournament', payload);
-  if (!j.ok){
-    alert('저장 실패: ' + (j.error||'unknown'));
-    return;
-  }
+  const j=await postJSON('upsertTournament', payload);
+  if(!j.ok) return alert('저장 실패: '+(j.error||'unknown'));
   await loadTournaments();
-  if (j.tourId) $('#tourId').value = j.tourId;
+  if(j.tourId) $('#tourId').value=j.tourId;
   alert('저장되었습니다.');
 }
-$('#saveTourBtn').addEventListener('click', async ()=>{
-  try{ await saveTournament(); }catch(e){ alert('저장 중 오류: ' + e.message); }
-});
+$('#saveTourBtn').addEventListener('click', async ()=>{ try{ await saveTournament(); }catch(e){ alert('저장 중 오류: '+e.message); } });
 
 $('#deleteTourBtn').addEventListener('click', async ()=>{
-  const id = ($('#tourId').value || '').trim();
-  if (!id) return alert('삭제할 대회가 선택되지 않았습니다.');
-  const adminCode = ($('#adminCode').value||'').trim();
-  if (!adminCode) return alert('관리코드를 입력하세요.');
-  if (!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+  const id=($('#tourId').value||'').trim(); if(!id) return alert('삭제할 대회가 선택되지 않았습니다.');
+  if(!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+  // 재확인용 관리코드 입력
+  const code2 = prompt('대회관리 코드를 다시 입력하세요:','');
+  if(!code2) return alert('관리코드가 입력되지 않았습니다.');
   try{
-    const j = await postJSON('removeTournament', { tourId: id, adminCode });
-    if (!j.ok) return alert('삭제 실패: ' + (j.error||'unknown'));
-    clearTourForm();
-    await loadTournaments();
-    alert('삭제되었습니다.');
-  }catch(e){
-    alert('삭제 중 오류: ' + e.message);
-  }
+    const j=await postJSON('removeTournament', { tourId:id, adminCode: code2 });
+    if(!j.ok) return alert('삭제 실패: '+(j.error||'unknown'));
+    clearTourForm(); await loadTournaments(); alert('삭제되었습니다.');
+  }catch(e){ alert('삭제 중 오류: '+e.message); }
 });
 
-/* ========= 이벤트 ========= */
-$('#reloadBtn').addEventListener('click', async ()=>{
-  await health();
-  await loadTournaments();
-  await loadTeams();
+/* ================== 상단 설정/검색/부트 ================== */
+$('#settingsBtn').addEventListener('click', ()=>{
+  const cur=(conf.appUrl||'').trim();
+  const val=prompt('Apps Script Web App URL을 입력하세요:', cur);
+  if(val===null) return; conf.appUrl=(val||'').trim(); store.save(conf);
+  alert('설정이 저장되었습니다. 새로고침합니다.'); location.reload();
 });
+$('#reloadBtn').addEventListener('click', async ()=>{ await health(); await loadTournaments(); await loadTeams(); });
 $('#tourFilter').addEventListener('change', loadTeams);
 $('#searchBtn').addEventListener('click', loadTeams);
 $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
-$('#addPlaceBtn').addEventListener('click', ()=> openAddrModal(null) );
 
-/* ========= 부트 ========= */
 (async function boot(){
-  if (!conf.appUrl) {
-    alert('처음 사용이라면 ⚙️ 버튼에서 Web App URL을 먼저 설정하세요.');
-    return;
-  }
-  await health();
-  await loadTournaments();
-  await loadTeams();
-  updateStatusBadge();
+  if(!conf.appUrl){ alert('처음 사용이라면 ⚙️에서 Web App URL을 먼저 설정하세요.'); return; }
+  await health(); await loadTournaments(); await loadTeams(); updateStatusBadge();
 })();
 </script>
 </body>
