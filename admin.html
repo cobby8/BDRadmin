@@ -21,7 +21,7 @@
   input:focus,select:focus,textarea:focus{border-color:var(--blue)}
   .btn{padding:10px 14px;border-radius:12px;border:1px solid #dfe6ee;background:#fff;cursor:pointer}
   .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .btn.danger{background:#fff;color:var(--red);border-color:#ffd1d1}
+  .btn.danger{background:#fff;color:#ef4444;border-color:#ffd1d1}
   .btn.ghost{background:#fff;color:#334155;border-color:#e6ecf5}
   .btn:disabled{opacity:.5;cursor:not-allowed}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -30,8 +30,8 @@
   .grid-2{grid-template-columns:1fr 1fr}
   .pill{
     display:inline-block;border:1px solid #e6ecf5;border-radius:999px;
-    padding:6px 10px;font-size:12px;margin:2px 0;background:#fff;
-    cursor:pointer; user-select:none; transition:background .12s, box-shadow .12s
+    padding:6px 10px;font-size:12px;margin:2px 0;background:#fff;cursor:pointer;
+    user-select:none; transition:background .12s, box-shadow .12s
   }
   .pill:hover{ background:#f8fbff; box-shadow:0 2px 6px rgba(23,105,255,.15) }
   .hr{height:1px;background:#eef2f7;margin:8px 0}
@@ -63,7 +63,7 @@
   .poster-box{display:grid;gap:10px}
   .poster-preview{display:flex;align-items:center;gap:12px}
   .poster-preview img{max-width:220px;max-height:220px;border-radius:12px;border:1px solid #e6ecf5;object-fit:contain;background:#fff}
-  .poster-drop{border:1px dashed #cbd5e1;border-radius:12px;padding:12px;text-align:center;color:#64748b}
+  .poster-drop{border:1px dashed #cbd5e1;border-radius:12px;padding:12px;text-align:center;color:#64748b;cursor:pointer}
 </style>
 </head>
 <body>
@@ -142,10 +142,7 @@
         <label>대회 포스터</label>
         <div id="posterBox" class="poster-box">
           <div class="poster-preview" id="posterPreview">
-            <div class="poster-drop" id="posterDrop">
-              이미지를 드래그하거나 클릭해 업로드
-              <input type="file" id="posterInput" accept="image/*" style="display:none">
-            </div>
+            <!-- 빈 상태는 renderPoster()가 드롭존 렌더링 -->
           </div>
           <div class="toolbar" style="justify-content:space-between">
             <div class="muted">
@@ -227,7 +224,6 @@
 <script>
 /* ===== 상수 ===== */
 const WEB_APP_URL='https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
-const APPLY_BASE ='https://bdrjoin.netlify.app/';
 const DIVISION_PRESETS={'일반부':['D3','D4','D5','D6','D7'],'대학부':['U1','U2','U3','UW'],'여성부':['D3','D4','D5'],'유소년부':['하모니','i1','i2','i3','i4']};
 
 const store={ key:'BDR_ADMIN_CONF', load(){ try { return JSON.parse(localStorage.getItem(this.key)||'{}'); } catch { return {}; } }, save(o){ localStorage.setItem(this.key, JSON.stringify(o||{})); } };
@@ -274,15 +270,95 @@ popCloseBtn.addEventListener('click', closePopover);
 
 /* ===== 목록 ===== */
 let TOURS={}, TOUR_ARRAY=[];
-async function loadTournaments(){ const j=await getJSON(apiUrl('tournaments')); TOURS={}; TOUR_ARRAY=j.rows||[]; TOUR_ARRAY.forEach(t=>{ const id=t.tourId||t.TourID||t.id; if(id) TOURS[id]=t; }); renderTournamentList(); renderTourFilter(); }
-function tourCard(t){ const id=t.tourId||t.TourID; const range=(t.start||t.end)?`${fmtDate(t.start)} ~ ${fmtDate(t.end)}`:'일정미정'; const rs=t.regStart||t['reg.start']||t.reg_start||t.regStartDate||''; const re=t.regEnd||t['reg.end']||t.reg_end||t.regEndDate||''; const st=calcStatus(rs,re); return `<div class="pill" data-id="${id}" tabindex="0" role="button"><b>${t.name}</b> · ${st} · ${range}</div>`; }
-function renderTournamentList(){ const box=$('#tourList'); box.innerHTML=(TOUR_ARRAY||[]).map(t=>tourCard(t)).join(''); box.querySelectorAll('.pill').forEach(el=>{ el.addEventListener('click', async ()=>{ if(!(await confirmDiscardIfDirty())) return; const t=TOURS[el.dataset.id] || TOURS[el.getAttribute('data-id')] || TOURS[el.getAttribute('data-id')]; const id=el.getAttribute('data-id')||el.dataset.id; const tour = TOURS[id]; loadTourToForm(tour,true); $('#editBtn').disabled=false; document.getElementById('formArea').scrollIntoView({behavior:'smooth', block:'start'}); }); }); }
+async function loadTournaments(){
+  const j=await getJSON(apiUrl('tournaments'));
+  TOURS={}; TOUR_ARRAY=j.rows||[];
+  TOUR_ARRAY.forEach(t=>{ const id=t.tourId||t.TourID||t.id; if(id) TOURS[id]=t; });
+  renderTournamentList();
+  renderTourFilter();              /* ✅ 상단 필터 채우기 */
+}
+function tourCard(t){
+  const id=t.tourId||t.TourID;
+  const range=(t.start||t.end)?`${fmtDate(t.start)} ~ ${fmtDate(t.end)}`:'일정미정';
+  const rs=t.regStart||t['reg.start']||t.reg_start||t.regStartDate||'';
+  const re=t.regEnd||t['reg.end']||t.reg_end||t.regEndDate||'';
+  const st=calcStatus(rs,re);
+  return `<div class="pill" data-id="${id}" tabindex="0" role="button"><b>${t.name}</b> · ${st} · ${range}</div>`;
+}
+function renderTournamentList(){
+  const box=$('#tourList');
+  box.innerHTML=(TOUR_ARRAY||[]).map(t=>tourCard(t)).join('');
+  box.querySelectorAll('.pill').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if(!(await confirmDiscardIfDirty())) return;
+      const id = el.getAttribute('data-id');
+      const tour = TOURS[id];
+      loadTourToForm(tour,true);       // 폼 로드
+      $('#editBtn').disabled=false;
+      // ✅ 상단 필터 동기화 + 팀 목록 즉시 로드
+      $('#tourFilter').value = id;
+      await loadTeams();
+      document.getElementById('formArea').scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+}
+
+/* ✅ 상단 대회 필터 옵션 채우기 */
+function renderTourFilter(){
+  const sel = $('#tourFilter');
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">전체 대회</option>';
+  (TOUR_ARRAY||[]).forEach(t=>{
+    const id=t.tourId||t.TourID; if(!id) return;
+    const period = (t.start||t.end) ? ` · ${fmtDate(t.start)}~${fmtDate(t.end)}` : '';
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = `${t.name||'(무제)'}${period}`;
+    sel.appendChild(opt);
+  });
+  // 기존 선택 유지
+  if (keep && [...sel.options].some(o=>o.value===keep)) sel.value = keep;
+}
 
 /* ===== 팀 표 ===== */
 function jerseySVG(hex,label){ const color=(/^#[0-9a-f]{6}$/i).test(hex||'')?hex:'#e5e7eb', text=(label||'').toUpperCase(); return `<svg width="42" height="52" viewBox="0 0 42 52" xmlns="http://www.w3.org/2000/svg"><g filter="url(#s)"><path d="M14 3 l4 6 h6 l4-6 h6 v15 l3 3 v27 a3 3 0 0 1 -3 3 h-26 a3 3 0 0 1 -3 -3 v-27 l3-3 v-15 z" fill="${color}" stroke="#cbd5e1"/><text x="21" y="31" font-family="system-ui,sans-serif" font-size="9" fill="#0f172a" text-anchor="middle" font-weight="700">${text}</text></g><defs><filter id="s" x="0" y="0" width="42" height="52"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity=".08"/></filter></defs></svg>`; }
-function normalizeTeamRow(r){ const region=[r.시도||r.province||'', r.시군구||r.city||''].join(' ').trim(); const cat=r.종별||r.category||'', div=r.디비전||r.division||''; function pickHex(p,f){ if(typeof p==='string'&&/^#[0-9a-f]{6}$/i.test(p))return p.toLowerCase(); if(typeof f==='string'){ const m=f.match(/#([0-9a-f]{6})/i); if(m)return('#'+m[1]).toLowerCase(); } return ''; } const homeHex=pickHex(r.uniformHomeHex, r['유니폼(홈)']); const awayHex=pickHex(r.uniformAwayHex, r['유니폼(어웨이)']); return {teamId:r.TeamID||r.teamId||'', tourId:(r.TourID||r.tourId||'').toString().trim(), tourName:r.tourName||r.TourName||r['대회명']||'', region, teamName:r.팀명||r.teamName||'', managerName:r.대표자이름||r.managerName||'', managerPhone:r.대표자연락처||r.managerPhone||'', category:cat, division:div, homeHex, awayHex, createdAt:r.신청일시||r.createdAt||'', editCode:r.수정코드||r.editCode||'' }; }
-function rowTeam(v){ return `<tr><td>${v.teamId}</td><td>${v.tourName||'-'}</td><td>${v.region||'-'}</td><td><div><b>${v.teamName||''}</b></div><div class="muted">${v.managerName||''} · ${v.managerPhone||''}</div></td><td>${v.category||''} · ${v.division||''}</td><td><div class="jersey">${jerseySVG(v.homeHex,'HOME')}${jerseySVG(v.awayHex,'AWAY')}</div></td><td>${fmtDate(v.createdAt)}</td><td class="right"><a class="btn" href="#" onclick="return false">수정 열기</a></td></tr>`; }
-async function loadTeams(){ try{ const tourId=($('#tourFilter').value||'').trim(); const j=await getJSON(apiUrl('teams', tourId?{tourId}:{}) ); let rows=Array.isArray(j.rows)?j.rows:[]; if(tourId) rows=rows.filter(r=>String(r.TourID||r.tourId||'').trim()===tourId); const q=($('#searchText').value||'').trim().toLowerCase(); if(q){ rows=rows.filter(r=>{ const v=normalizeTeamRow(r); return [v.teamId,v.tourName,v.region,v.teamName,v.managerName,v.managerPhone,v.category,v.division].join(' ').toLowerCase().includes(q); }); } $('#teamsTbody').innerHTML=rows.map(r=>rowTeam(normalizeTeamRow(r))).join('') || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`; }catch(e){ $('#teamsTbody').innerHTML=`<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`; } }
+function normalizeTeamRow(r){
+  const region=[r.시도||r.province||'', r.시군구||r.city||''].join(' ').trim();
+  const cat=r.종별||r.category||'', div=r.디비전||r.division||'';
+  function pickHex(p,f){ if(typeof p==='string'&&/^#[0-9a-f]{6}$/i.test(p))return p.toLowerCase(); if(typeof f==='string'){ const m=f.match(/#([0-9a-f]{6})/i); if(m)return('#'+m[1]).toLowerCase(); } return ''; }
+  const homeHex=pickHex(r.uniformHomeHex, r['유니폼(홈)']);
+  const awayHex=pickHex(r.uniformAwayHex, r['유니폼(어웨이)']);
+  return {teamId:r.TeamID||r.teamId||'', tourId:(r.TourID||r.tourId||'').toString().trim(), tourName:r.tourName||r.TourName||r['대회명']||'', region, teamName:r.teamNameKo||r.팀명||r.teamName||'', managerName:r.managerName||r.대표자이름||'', managerPhone:r.managerPhone||r.대표자연락처||'', category:cat, division:div, homeHex, awayHex, createdAt:r.createdAt||r.신청일시||'', editCode:r.editCode||r.수정코드||'' };
+}
+function rowTeam(v){
+  return `<tr>
+    <td>${v.teamId}</td>
+    <td>${v.tourName||'-'}</td>
+    <td>${v.region||'-'}</td>
+    <td><div><b>${v.teamName||''}</b></div><div class="muted">${v.managerName||''} · ${v.managerPhone||''}</div></td>
+    <td>${v.category||''} · ${v.division||''}</td>
+    <td><div class="jersey">${jerseySVG(v.homeHex,'HOME')}${jerseySVG(v.awayHex,'AWAY')}</div></td>
+    <td>${fmtDate(v.createdAt)}</td>
+    <td class="right"><a class="btn" href="#" onclick="return false">수정 열기</a></td>
+  </tr>`;
+}
+async function loadTeams(){
+  try{
+    const tourId=($('#tourFilter').value||'').trim();
+    const j=await getJSON(apiUrl('teams', tourId?{tourId}:{}) );
+    let rows=Array.isArray(j.rows)?j.rows:[];
+    if(tourId) rows=rows.filter(r=>String(r.TourID||r.tourId||'').trim()===tourId);
+    const q=($('#searchText').value||'').trim().toLowerCase();
+    if(q){
+      rows=rows.filter(r=>{
+        const v=normalizeTeamRow(r);
+        return [v.teamId,v.tourName,v.region,v.teamName,v.managerName,v.managerPhone,v.category,v.division].join(' ').toLowerCase().includes(q);
+      });
+    }
+    $('#teamsTbody').innerHTML=rows.map(r=>rowTeam(normalizeTeamRow(r))).join('') || `<tr><td colspan="8" class="muted">데이터 없음</td></tr>`;
+  }catch(e){
+    $('#teamsTbody').innerHTML=`<tr><td colspan="8" class="muted">불러오기 오류: ${e.message}</td></tr>`;
+  }
+}
 
 /* ===== 상태/잠금 ===== */
 let DIV_STATE=[];
@@ -309,7 +385,7 @@ function renderDivRow(container, group, values, editable){
   const row=el(`<div class="place-item"></div>`);
   const left=el(`<div style="display:flex;align-items:center;gap:8px"><b>${group}</b></div>`);
   const delSmall=el(`<button class="btn danger" style="padding:4px 8px;font-size:12px" ${editable?'':'disabled'}>삭제</button>`);
-  delSmall.addEventListener('click',()=>{ if(FORM_LOCKED) return; if(confirm(`"${group}" 구분을 삭제할까요?`)){ DIV_STATE=DIV_STATE.filter(s=>s.group!==group); DIRTY=true; refreshDivUI(); } });
+  delSmall.addEventListener('click',()=>{ if(FORM_LOCKED) return; if(confirm(\`"\${group}" 구분을 삭제할까요?\`)){ DIV_STATE=DIV_STATE.filter(s=>s.group!==group); DIRTY=true; refreshDivUI(); } });
   left.appendChild(delSmall);
   row.appendChild(left);
 
@@ -366,7 +442,6 @@ function openDivFloating(){
   });
   openPopoverCentered('구분/종별 선택', body, actions);
 }
-
 function openAdminCodeFloating(onOk){
   const body = el(`
     <div>
@@ -394,10 +469,8 @@ function openAdminCodeFloating(onOk){
     if (typeof onOk === 'function') onOk();
     closePopover();
   });
-
   openPopoverCentered('관리코드 확인', body, actions);
 }
-
 function openPlaceFloating(initName, onApply){
   if (FORM_LOCKED){
     if (!CURRENT_TOUR_ID) setLocked(false);
@@ -423,7 +496,6 @@ function openPlaceFloating(initName, onApply){
     if (!name) return alert('장소명을 입력하세요.');
     onApply(name); DIRTY=true; closePopover();
   });
-
   openPopoverCentered(initName? '장소명 수정' : '장소 추가', body, actions);
 }
 
@@ -458,7 +530,14 @@ function loadTourToForm(t, locked=true){
   $('#tourId').value   = id;
   $('#tourName').value = t?.name || '';
   $('#tourUrl').value  = t?.url  || '';
-  if (typeof t?.url==='string' && t.url.startsWith('data:image/')) { POSTER_DATA_URL = t.url; renderPoster(); } else { POSTER_DATA_URL=''; renderPoster(); }
+
+  // 포스터: 데이터URL이면 미리보기, 아니면 빈 상태 유지
+  if (typeof t?.url==='string' && t.url.startsWith('data:image/')) {
+    POSTER_DATA_URL = t.url;
+  } else {
+    POSTER_DATA_URL = '';
+  }
+  renderPoster();
 
   $('#tourStart').value= toInputDateOnly(t?.start);
   $('#tourEnd').value  = toInputDateOnly(t?.end);
@@ -487,29 +566,59 @@ function clearTourForm(){
   document.getElementById('formArea').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
-/* ===== Poster helpers ===== */
-let POSTER_DATA_URL='';  // 전역 위치 아래로 이동
-const posterDrop=document.getElementById('posterDrop');
-const posterInput=document.getElementById('posterInput');
-const posterPreview=document.getElementById('posterPreview');
-const posterEmbed=document.getElementById('posterEmbed');
-const posterCopy=document.getElementById('posterCopy');
-const posterClear=document.getElementById('posterClear');
-
-posterDrop.addEventListener('click', ()=> posterInput.click());
-posterDrop.addEventListener('dragover', e=>{ e.preventDefault(); posterDrop.style.borderColor='#1769ff'; });
-posterDrop.addEventListener('dragleave', ()=>{ posterDrop.style.borderColor='#cbd5e1'; });
-posterDrop.addEventListener('drop', e=>{ e.preventDefault(); posterDrop.style.borderColor='#cbd5e1'; if(e.dataTransfer.files?.[0]) handlePosterFile(e.dataTransfer.files[0]); });
-posterInput.addEventListener('change', e=>{ const f=e.target.files?.[0]; if(f) handlePosterFile(f); });
-async function handlePosterFile(file){ if(!file.type.startsWith('image/')) return alert('이미지 파일을 선택하세요.'); POSTER_DATA_URL = await compressImageToDataURL(file, 1280, 0.8); renderPoster(); }
-function renderPoster(){ posterPreview.innerHTML = POSTER_DATA_URL ? `<img src="${POSTER_DATA_URL}" alt="poster"><div class="muted">업로드 완료</div>` : `<div class="poster-drop" id="posterDropInner">이미지를 드래그하거나 클릭해 업로드</div>`; posterCopy.disabled = !POSTER_DATA_URL; posterClear.disabled = !POSTER_DATA_URL; }
-posterCopy.addEventListener('click', async ()=>{ if(!POSTER_DATA_URL) return; try{ await navigator.clipboard.writeText(POSTER_DATA_URL); alert('복사되었습니다.'); }catch{ alert('복사 실패'); } });
-posterClear.addEventListener('click', ()=>{ POSTER_DATA_URL=''; renderPoster(); });
-async function compressImageToDataURL(file, maxW=1280, quality=0.8){ const bmp=await createImageBitmap(file); const scale=Math.min(1, maxW/bmp.width); const w=Math.round(bmp.width*scale), h=Math.round(bmp.height*scale); const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d'); ctx.drawImage(bmp,0,0,w,h); const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',quality)); return await blobToDataURL(blob); }
-function blobToDataURL(blob){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob); }); }
+/* ===== 포스터 업로드(안정화) ===== */
+let POSTER_DATA_URL='';
+function renderPoster(){
+  const prev=$('#posterPreview');
+  if(!POSTER_DATA_URL){
+    prev.innerHTML = `
+      <div class="poster-drop" id="posterDrop">
+        이미지를 드래그하거나 클릭해 업로드
+        <input type="file" id="posterInput" accept="image/*" style="display:none">
+      </div>`;
+    $('#posterCopy').disabled=true; $('#posterClear').disabled=true;
+    wirePosterInteractions();               /* ✅ 드롭존 다시 그릴 때마다 이벤트 연결 */
+  }else{
+    prev.innerHTML = `<img src="${POSTER_DATA_URL}" alt="poster"><div class="muted">업로드 완료</div>`;
+    $('#posterCopy').disabled=false; $('#posterClear').disabled=false;
+  }
+}
+function wirePosterInteractions(){
+  const drop = document.getElementById('posterDrop');
+  const input = document.getElementById('posterInput');
+  if(!drop || !input) return;
+  drop.addEventListener('click', ()=> input.click());
+  drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.style.borderColor='#1769ff'; });
+  drop.addEventListener('dragleave', ()=>{ drop.style.borderColor='#cbd5e1'; });
+  drop.addEventListener('drop', e=>{ e.preventDefault(); drop.style.borderColor='#cbd5e1'; const f=e.dataTransfer.files?.[0]; if(f) handlePosterFile(f); });
+  input.addEventListener('change', e=>{ const f=e.target.files?.[0]; if(f) handlePosterFile(f); });
+}
+async function handlePosterFile(file){
+  try{
+    POSTER_DATA_URL = await fileToJpegDataUrl(file, 1280, 0.85);
+    renderPoster();
+  }catch(e){
+    alert('이미지 처리 중 오류: '+e.message);
+  }
+}
+async function fileToJpegDataUrl(file, maxW=1280, quality=0.85){
+  const readAsDataURL = f => new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(f); });
+  const srcUrl = await readAsDataURL(file);
+  const img = await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=srcUrl; });
+  const scale = Math.min(1, maxW / (img.width||1));
+  const w = Math.round((img.width||1) * scale), h=Math.round((img.height||1)*scale);
+  const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+document.getElementById('posterCopy').addEventListener('click', async ()=>{
+  if(!POSTER_DATA_URL) return;
+  try{ await navigator.clipboard.writeText(POSTER_DATA_URL); alert('복사되었습니다.'); }catch{ alert('복사 실패'); }
+});
+document.getElementById('posterClear').addEventListener('click', ()=>{ POSTER_DATA_URL=''; renderPoster(); });
 
 /* ===== 저장 로직 ===== */
-$('#toggleCodeBtn').addEventListener('click',()=>{ const i=$('#adminCode'); i.type=(i.type==='password'?'text':'password'); });
+document.getElementById('toggleCodeBtn').addEventListener('click',()=>{ const i=$('#adminCode'); i.type=(i.type==='password'?'text':'password'); });
 async function doSave(){
   const name=($('#tourName').value||'').trim(); if(!name) return alert('대회명을 입력하세요.');
   const adminCode=($('#adminCode').value||'').trim(); if(!adminCode) return openAdminCodeFloating(()=>doSave());
@@ -531,6 +640,7 @@ async function doSave(){
     places:  getPlaces(),
     adminCode
   };
+  // 포스터: embed 체크 또는 url 비어있으면 dataURL 저장
   if (POSTER_DATA_URL && (document.getElementById('posterEmbed').checked || !base.url)){ base.url = POSTER_DATA_URL; }
 
   const payload = {
@@ -549,7 +659,12 @@ async function doSave(){
   const j=await postJSON('upsertTournament', payload);
   if(!j.ok) return alert('저장 실패: '+(j.error||'unknown'));
   await loadTournaments();
-  if(j.tourId) $('#tourId').value=j.tourId;
+  if(j.tourId){
+    $('#tourId').value=j.tourId;
+    // ✅ 방금 저장한 대회를 필터/목록에 반영하고 팀도 같이 로드
+    $('#tourFilter').value = j.tourId;
+    await loadTeams();
+  }
   alert('저장되었습니다.');
   DIRTY=false; setLocked(true); $('#tourFormTitle').textContent='대회 수정 (읽기 전용)';
 }
@@ -559,29 +674,47 @@ document.getElementById('saveTourBtn').addEventListener('click', async ()=>{
 });
 
 /* ===== 상단 버튼/탐색 ===== */
-$('#settingsBtn').addEventListener('click', ()=>{ const cur=(conf.appUrl||'').trim(); const val=prompt('Apps Script Web App URL을 입력하세요:',cur); if(val===null) return; conf.appUrl=(val||'').trim(); store.save(conf); alert('설정이 저장되었습니다. 새로고침합니다.'); location.reload(); });
-$('#reloadBtn').addEventListener('click', async ()=>{ if(!(await confirmDiscardIfDirty())) return; await health(); await loadTournaments(); await loadTeams(); });
-$('#newTourBtn').addEventListener('click', async ()=>{ if(!(await confirmDiscardIfDirty())) return; clearTourForm(); });   /* ✅ 신규대회: 폼초기화 + 잠금해제 + 스크롤 */
-$('#editBtn').addEventListener('click', ()=>{ if(!CURRENT_TOUR_ID) return alert('수정할 대회를 먼저 선택하세요.'); openAdminCodeFloating(); });
-$('#addDivSetBtn').addEventListener('click', ()=> openDivFloating());
-$('#addPlaceBtn').addEventListener('click', ()=> openPlaceFloating('', (name)=>{ $('#placeList').appendChild(makePlaceRow({name})); }));
+document.getElementById('settingsBtn').addEventListener('click', ()=>{
+  const cur=(conf.appUrl||'').trim();
+  const val=prompt('Apps Script Web App URL을 입력하세요:',cur);
+  if(val===null) return;
+  conf.appUrl=(val||'').trim(); store.save(conf);
+  alert('설정이 저장되었습니다. 새로고침합니다.'); location.reload();
+});
+document.getElementById('reloadBtn').addEventListener('click', async ()=>{
+  if(!(await confirmDiscardIfDirty())) return;
+  await health(); await loadTournaments(); await loadTeams(); updateStatusBadge(); renderPoster();
+});
+document.getElementById('newTourBtn').addEventListener('click', async ()=>{
+  if(!(await confirmDiscardIfDirty())) return;
+  clearTourForm();   /* ✅ 신규대회: 폼초기화 + 잠금해제 + 스크롤 */
+});
+document.getElementById('editBtn').addEventListener('click', ()=>{ if(!CURRENT_TOUR_ID) return alert('수정할 대회를 먼저 선택하세요.'); openAdminCodeFloating(); });
 
-document.getElementById('clearAllDivBtn').addEventListener('click', ()=>{ if(FORM_LOCKED) return; if(DIV_STATE.length===0) return; if(confirm('모든 구분/종별을 삭제할까요?')){ DIV_STATE=[]; DIRTY=true; refreshDivUI(); }});
+document.getElementById('addDivSetBtn').addEventListener('click', ()=> openDivFloating());
+document.getElementById('addPlaceBtn').addEventListener('click', ()=> openPlaceFloating('', (name)=>{ $('#placeList').appendChild(makePlaceRow({name})); }));
 
-$('#tourFilter').addEventListener('change', async ()=>{ if(!(await confirmDiscardIfDirty())){ $('#tourFilter').value=''; return; } loadTeams(); });
-$('#searchBtn').addEventListener('click', loadTeams);
-$('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
+document.getElementById('clearAllDivBtn').addEventListener('click', ()=>{
+  if(FORM_LOCKED) return; if(DIV_STATE.length===0) return;
+  if(confirm('모든 구분/종별을 삭제할까요?')){ DIV_STATE=[]; DIRTY=true; refreshDivUI(); }
+});
 
-/* ===== Poster wiring ===== */
-function renderPoster(){ const prev=document.getElementById('posterPreview'); if (!POSTER_DATA_URL){ prev.innerHTML=`<div class="poster-drop" id="posterDropInner">이미지를 드래그하거나 클릭해 업로드</div>`; posterCopy.disabled=true; posterClear.disabled=true; return; } prev.innerHTML=`<img src="${POSTER_DATA_URL}" alt="poster"><div class="muted">업로드 완료</div>`; posterCopy.disabled=false; posterClear.disabled=false; }
-const posterDrop2=document.getElementById('posterDrop');
-posterDrop2.addEventListener('click', ()=> posterInput.click());
-posterDrop2.addEventListener('dragover', e=>{ e.preventDefault(); posterDrop2.style.borderColor='#1769ff'; });
-posterDrop2.addEventListener('dragleave', ()=>{ posterDrop2.style.borderColor='#cbd5e1'; });
-posterDrop2.addEventListener('drop', e=>{ e.preventDefault(); posterDrop2.style.borderColor='#cbd5e1'; if(e.dataTransfer.files?.[0]) handlePosterFile(e.dataTransfer.files[0]); });
+document.getElementById('tourFilter').addEventListener('change', async ()=>{
+  if(!(await confirmDiscardIfDirty())){ document.getElementById('tourFilter').value=''; return; }
+  await loadTeams();                 /* ✅ 상단 필터 변경 시 즉시 반영 */
+});
+document.getElementById('searchBtn').addEventListener('click', loadTeams);
+document.getElementById('searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
 
 /* ===== 부트 ===== */
-(async function boot(){ if(!conf.appUrl){ alert('처음 사용이라면 ⚙️에서 Web App URL을 먼저 설정하세요.'); return; } await health(); await loadTournaments(); await loadTeams(); updateStatusBadge(); renderPoster(); })();
+(async function boot(){
+  if(!conf.appUrl){ alert('처음 사용이라면 ⚙️에서 Web App URL을 먼저 설정하세요.'); return; }
+  await health();
+  await loadTournaments();
+  await loadTeams();
+  updateStatusBadge();
+  renderPoster();   // 초기 드롭존
+})();
 </script>
 </body>
 </html>
