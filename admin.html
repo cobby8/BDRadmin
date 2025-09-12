@@ -251,17 +251,75 @@ function toInputDT(s){ if(!s) return ''; if(typeof s==='string'){ const m=s.matc
 function calcStatus(rs,re){ if(!rs||!re) return '상태미정'; const s=new Date(rs), e=new Date(re), n=new Date(); if(isNaN(s)||isNaN(e)) return '상태미정'; if(n<s) return '접수전'; if(n>e) return '마감'; return '접수중'; }
 function statusBadgeHtml(st){ const m={'접수중':{bg:'#ecfdf5',bd:'#d1fae5',fg:'#16a34a'},'접수전':{bg:'#eff6ff',bd:'#dbeafe',fg:'#1769ff'},'마감':{bg:'#fef2f2',bd:'#fee2e2',fg:'#ef4444'},'상태미정':{bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'}}; const c=m[st]||m['상태미정']; return `<span class="badge" style="background:${c.bg};border-color:${c.bd};color:${c.fg}">${st}</span>`; }
 
+/* ========= API 유틸 ========= */
+const truthyFlag = (v)=>{
+  if (v===true || v===1) return true;
+  if (typeof v==='string') {
+    const s=v.trim().toLowerCase();
+    if (['true','ok','success','done','1','yes'].includes(s)) return true;
+  }
+  return false;
+};
+const isSuccessResponse = (j)=>{
+  if (!j || typeof j!=='object') return false;
+  if (truthyFlag(j.ok) || truthyFlag(j.success) || truthyFlag(j.status) || truthyFlag(j.result)) return true;
+  if (j.rows!==undefined) return true;
+  if (j.tourId || j.id || (j.data && (j.data.tourId || j.data.id))) return true;
+  if (Number.isFinite(j.affectedRows) || Number.isFinite(j.updated) || Number.isFinite(j.inserted) || Number.isFinite(j.count)) return true;
+  return false;
+};
+function pathVariants(path){
+  const base = String(path||'');
+  const low  = base.toLowerCase();
+  const pascal = base.slice(0,1).toUpperCase()+base.slice(1);
+  const snake  = base.replace(/([A-Z])/g,'_$1').replace(/^_/,'').toLowerCase();
+  const kebab  = snake.replace(/_/g,'-');
+  const upper  = low.toUpperCase();
+  return [...new Set([base, low, pascal, snake, kebab, upper])];
+}
+
 /* ========= API ========= */
 function apiUrl(path,q={}){ 
   let base=(conf.appUrl||'').trim(); if(!validWebAppUrl(base)){ base=WEB_APP_URL; conf.appUrl=base; store.save(conf); }
   const u=new URL(base); u.searchParams.set('path', path); Object.entries(q).forEach(([k,v])=>u.searchParams.set(k,v)); return u.toString();
 }
-async function getJSON(u){ const r=await fetch(u,{cache:'no-store',mode:'cors',credentials:'omit'}); const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); } }
-async function postJSONCompat(paths, payload){
-  const tryOnce=async(p)=>{ const r=await fetch(apiUrl(p),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload||{}),mode:'cors',credentials:'omit'}); const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); } };
-  let last=null; for(const p of paths){ try{ const j=await tryOnce(p); if(j && (j.ok===true || j.ok==='true' || (j.rows!==undefined))) return j; }catch(e){ last=e; } } if(last) throw last; return {ok:false,error:'unknown'};
+async function getJSON(u){
+  const r=await fetch(u,{cache:'no-store',mode:'cors',credentials:'omit'});
+  const t=await r.text();
+  try{ return JSON.parse(t); }
+  catch{ throw new Error('JSON 파싱 실패'); }
 }
-async function postJSON(path,payload){ const c=[path,path.toLowerCase()].filter((v,i,a)=>a.indexOf(v)===i); return postJSONCompat(c,payload); }
+async function postJSONCompat(paths, payload){
+  const tryOnce=async(p)=>{
+    const r=await fetch(apiUrl(p),{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(payload||{}),
+      mode:'cors',
+      credentials:'omit'
+    });
+    const t=await r.text();
+    try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); }
+  };
+  let lastError=null, lastResp=null;
+  for(const p of paths){
+    try{
+      const j=await tryOnce(p);
+      lastResp=j;
+      if (isSuccessResponse(j) || j?.error!==undefined || j?.message!==undefined || j?.msg!==undefined) {
+        // 성공이거나 에러 메시지가 있는 응답이면 바로 반환
+        return j;
+      }
+    }catch(e){ lastError=e; }
+  }
+  if (lastResp) return lastResp;      // 서버가 뭔가 준 경우 그대로 전달(판단은 호출부에서)
+  if (lastError) throw lastError;     // 네트워크/파싱 오류
+  return { ok:false, error:'unknown' };
+}
+async function postJSON(path,payload){
+  const candidates = pathVariants(path);
+  return postJSONCompat(candidates, payload);
+}
 
 /* ========= Floating core ========= */
 const overlay = document.getElementById('overlay');
@@ -299,7 +357,7 @@ function openAdminCodeFloating(onOk){
 
 /* ========= 목록 ========= */
 let TOURS={}, TOUR_ARRAY=[];
-async function health(){ try{ setHealth('#3b82f6','연결 확인 중…'); const j=await getJSON(apiUrl('health')); if(j && j.ok){ setHealth('#22c55e','연결 정상'); return true; } setHealth('#ef4444','health 비정상'); return false; }catch(e){ setHealth('#ef4444','연결 실패'); return false; } }
+async function health(){ try{ setHealth('#3b82f6','연결 확인 중…'); const j=await getJSON(apiUrl('health')); if(j && (j.ok || j.status==='ok' || j.success || j.rows!==undefined)){ setHealth('#22c55e','연결 정상'); return true; } setHealth('#ef4444','health 비정상'); return false; }catch(e){ setHealth('#ef4444','연결 실패'); return false; } }
 
 async function loadTournaments(){
   const j=await getJSON(apiUrl('tournaments'));
@@ -614,12 +672,19 @@ async function doSave(){
     divs_json: JSON.stringify(base.divs)
   };
 
-  const j=await postJSON('upsertTournament', payload);
-  if(!j.ok) return alert('저장 실패: '+(j.error||'unknown'));
-  await loadTournaments();
-  if(j.tourId) $('#tourId').value=j.tourId;
-  alert('저장되었습니다.');
-  DIRTY=false; setLocked(true); $('#tourFormTitle').textContent='대회 수정 (읽기 전용)';
+  try{
+    const j=await postJSON('upsertTournament', payload);
+    if (!isSuccessResponse(j)) {
+      const msg = j?.error || j?.message || j?.msg || '서버 응답을 이해할 수 없습니다.';
+      return alert('저장 실패: ' + msg);
+    }
+    await loadTournaments();
+    if(j.tourId) $('#tourId').value=j.tourId;
+    alert('저장되었습니다.');
+    DIRTY=false; setLocked(true); $('#tourFormTitle').textContent='대회 수정 (읽기 전용)';
+  }catch(e){
+    alert('저장 실패: ' + (e?.message || e));
+  }
 }
 
 /* ========= 삭제 ========= */
@@ -627,7 +692,6 @@ async function doDelete(){
   if(!CURRENT_TOUR_ID) return alert('삭제할 대회가 없습니다.');
   let adminCode=($('#adminCode').value||'').trim();
   if(!adminCode){
-    // 관리코드 먼저 확인 후 다시 삭제 진행
     return openAdminCodeFloating(()=> doDelete());
   }
   const name = ($('#tourName').value||'').trim();
@@ -635,8 +699,11 @@ async function doDelete(){
 
   const payload={ tourId: CURRENT_TOUR_ID, adminCode };
   try{
-    const j = await postJSONCompat(['deleteTournament','removeTournament'], payload);
-    if(!(j && (j.ok===true || j.ok==='true'))) throw new Error(j?.error || '삭제 실패');
+    const j = await postJSONCompat(pathVariants('deleteTournament'), payload);
+    if (!isSuccessResponse(j)) {
+      const msg = j?.error || j?.message || j?.msg || '서버 응답을 이해할 수 없습니다.';
+      return alert('삭제 실패: ' + msg);
+    }
     await loadTournaments();
     await loadTeams();
     clearTourForm();
@@ -650,13 +717,13 @@ async function doDelete(){
 $('#settingsBtn').addEventListener('click', ()=>{ const cur=(conf.appUrl||'').trim(); const val=prompt('Apps Script Web App URL을 입력하세요 (…/exec):',cur); if(val===null) return; conf.appUrl=(val||'').trim(); store.save(conf); alert('설정이 저장되었습니다. 새로고침합니다.'); location.reload(); });
 $('#reloadBtn').addEventListener('click', async ()=>{ if(!(await confirmDiscardIfDirty())) return; await health(); await loadTournaments(); await loadTeams(); renderPoster(); });
 $('#newTourBtn').addEventListener('click', async ()=>{ if(!(await confirmDiscardIfDirty())) return; clearTourForm(); });
-$('#editBtn').addEventListener('click', ()=>{ if(!CURRENT_TOUR_ID) return alert('수정할 대회를 먼저 선택하세요.'); openAdminCodeFloating(()=>{ $('#tourFormTitle').textContent='대회 수정 (편집중)'; }); });  // 관리코드 확인 후 편집 해제 & 제목 변경
+$('#editBtn').addEventListener('click', ()=>{ if(!CURRENT_TOUR_ID) return alert('수정할 대회를 먼저 선택하세요.'); openAdminCodeFloating(()=>{ $('#tourFormTitle').textContent='대회 수정 (편집중)'; }); });
 
 $('#tourFilter').addEventListener('change', async ()=>{ if(!(await confirmDiscardIfDirty())){ $('#tourFilter').value=''; return; } await loadTeams(); });
 $('#searchBtn').addEventListener('click', loadTeams);
 $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
 
-// [추가] 저장/삭제/장소추가/종별 전체삭제 버튼 연결
+// 저장/삭제/장소추가/종별 전체삭제 버튼 연결
 document.getElementById('saveTourBtn').addEventListener('click', doSave);
 document.getElementById('deleteTourBtn').addEventListener('click', doDelete);
 document.getElementById('addPlaceBtn').addEventListener('click', ()=> {
