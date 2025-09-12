@@ -361,7 +361,6 @@ function normalizeTeamRow(r){
   };
 }
 function rowTeam(v){
-  // 팀ID 버튼 삭제, 열기 버튼만 유지
   const openBtn = `<a href="#" class="btn primary open-edit" data-id="${v.teamId}" data-code="${v.editCode}" title="신청서 새창 열기">열기</a>`;
   return `<tr>
     <td class="ellipsis" title="${v.tourName||''}">${v.tourName||'-'}</td>
@@ -623,15 +622,52 @@ async function doSave(){
   DIRTY=false; setLocked(true); $('#tourFormTitle').textContent='대회 수정 (읽기 전용)';
 }
 
+/* ========= 삭제 ========= */
+async function doDelete(){
+  if(!CURRENT_TOUR_ID) return alert('삭제할 대회가 없습니다.');
+  let adminCode=($('#adminCode').value||'').trim();
+  if(!adminCode){
+    // 관리코드 먼저 확인 후 다시 삭제 진행
+    return openAdminCodeFloating(()=> doDelete());
+  }
+  const name = ($('#tourName').value||'').trim();
+  if(!confirm(`"${name || CURRENT_TOUR_ID}" 대회를 정말 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+
+  const payload={ tourId: CURRENT_TOUR_ID, adminCode };
+  try{
+    const j = await postJSONCompat(['deleteTournament','removeTournament'], payload);
+    if(!(j && (j.ok===true || j.ok==='true'))) throw new Error(j?.error || '삭제 실패');
+    await loadTournaments();
+    await loadTeams();
+    clearTourForm();
+    alert('삭제되었습니다.');
+  }catch(e){
+    alert('삭제 중 오류: ' + (e.message||e));
+  }
+}
+
 /* ========= 상단 버튼/탐색 ========= */
 $('#settingsBtn').addEventListener('click', ()=>{ const cur=(conf.appUrl||'').trim(); const val=prompt('Apps Script Web App URL을 입력하세요 (…/exec):',cur); if(val===null) return; conf.appUrl=(val||'').trim(); store.save(conf); alert('설정이 저장되었습니다. 새로고침합니다.'); location.reload(); });
 $('#reloadBtn').addEventListener('click', async ()=>{ if(!(await confirmDiscardIfDirty())) return; await health(); await loadTournaments(); await loadTeams(); renderPoster(); });
 $('#newTourBtn').addEventListener('click', async ()=>{ if(!(await confirmDiscardIfDirty())) return; clearTourForm(); });
-$('#editBtn').addEventListener('click', ()=>{ if(!CURRENT_TOUR_ID) return alert('수정할 대회를 먼저 선택하세요.'); openAdminCodeFloating(()=>{}); });  // 수정 시 관리코드 팝업
+$('#editBtn').addEventListener('click', ()=>{ if(!CURRENT_TOUR_ID) return alert('수정할 대회를 먼저 선택하세요.'); openAdminCodeFloating(()=>{ $('#tourFormTitle').textContent='대회 수정 (편집중)'; }); });  // 관리코드 확인 후 편집 해제 & 제목 변경
 
 $('#tourFilter').addEventListener('change', async ()=>{ if(!(await confirmDiscardIfDirty())){ $('#tourFilter').value=''; return; } await loadTeams(); });
 $('#searchBtn').addEventListener('click', loadTeams);
 $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
+
+// [추가] 저장/삭제/장소추가/종별 전체삭제 버튼 연결
+document.getElementById('saveTourBtn').addEventListener('click', doSave);
+document.getElementById('deleteTourBtn').addEventListener('click', doDelete);
+document.getElementById('addPlaceBtn').addEventListener('click', ()=> {
+  if (FORM_LOCKED){ alert('상단 "수정" 버튼으로 편집을 해제하세요.'); return; }
+  openPlaceFloating('', (name)=>{ const row=makePlaceRow({name}); $('#placeList').appendChild(row); DIRTY=true; });
+});
+document.getElementById('clearAllDivBtn').addEventListener('click', ()=> {
+  if (FORM_LOCKED) return;
+  if(!DIV_STATE.length) return;
+  if(confirm('모든 구분/종별을 삭제할까요?')){ DIV_STATE=[]; DIRTY=true; refreshDivUI(); }
+});
 
 /* ========= 부트 ========= */
 (async function boot(){ await health(); await loadTournaments(); await loadTeams(); renderPoster(); })();
