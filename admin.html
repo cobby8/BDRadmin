@@ -120,7 +120,7 @@
         <div class="grid">
           <input id="tourId" placeholder="자동생성 (수정 시 고정)" disabled>
           <input id="tourName" placeholder="대회명" data-editable>
-          <input id="tourUrl" placeholder="안내 페이지 URL (선택)" data-editable inputmode="url" autocomplete="off" spellcheck="false">
+          <input id="tourUrl" placeholder="안내 페이지 URL (선택 또는 포스터 데이터URL)" data-editable inputmode="url" autocomplete="off" spellcheck="false">
         </div>
 
         <label class="muted" style="margin-top:8px">종별 설정</label>
@@ -147,7 +147,7 @@
         <div class="poster-preview" id="posterPreview"></div>
         <div class="toolbar" style="justify-content:space-between;margin-top:6px">
           <div class="muted">
-            <label><input type="checkbox" id="posterEmbed"> 데이터URL로 저장(시트 poster 칼럼)</label> <!-- [CHANGED] 안내 문구 -->
+            <label><input type="checkbox" id="posterEmbed"> 시트 url에 저장(데이터URL)</label>
           </div>
           <div class="toolbar">
             <button class="btn" id="posterCopy" disabled>주소 복사</button>
@@ -538,7 +538,7 @@ function openPlaceFloating(initName,onApply){
     if (!CURRENT_TOUR_ID) setLocked(false);
     else { alert('상단 "수정" 버튼을 눌러 편집을 해제하세요.'); return; }
   }
-  const body=el(`<div><label>장소명</label><input id="popPlaceName" placeholder="예: 서울특별자치시학생체육관" style="width:100%;border:1px solid #e6ecf5;border-radius:12px;padding:12px"/></div>`);
+  const body=el(`<div><label>장소명</label><input id="popPlaceName" placeholder="예: 서울특별시학생체육관" style="width:100%;border:1px solid #e6ecf5;border-radius:12px;padding:12px"/></div>`);
   body.querySelector('#popPlaceName').value=initName||'';
   const actions=el(`<div></div>`); const cancel=el(`<button class="btn">취소</button>`); const ok=el(`<button class="btn primary">적용</button>`);
   actions.appendChild(cancel); actions.appendChild(ok);
@@ -560,7 +560,7 @@ function renderPoster(){
     $('#posterCopy').disabled=true; $('#posterClear').disabled=true;
     wirePosterInteractions();
   }else{
-    prev.innerHTML = `<img src="${POSTER_DATA_URL}" alt="poster"><div class="muted">업로드/지정 완료</div>`;
+    prev.innerHTML = `<img src="${POSTER_DATA_URL}" alt="poster"><div class="muted">업로드 완료</div>`;
     $('#posterCopy').disabled=false; $('#posterClear').disabled=false;
   }
 }
@@ -603,9 +603,9 @@ function loadTourToForm(t, locked=true){
   $('#tourName').value = t?.name || '';
   $('#tourUrl').value  = t?.url  || '';
 
-  // [FIX] poster 칼럼 반영: poster > posterUrl > url(이미지) 순으로 프리뷰
-  const posterSrc = (t && (t.poster || t.posterUrl || (typeof t.url==='string' && /^data:image\//i.test(t.url) ? t.url : ''))) || '';
-  POSTER_DATA_URL = posterSrc; 
+  // poster: 데이터URL이면 미리보기
+  if (typeof t?.url==='string' && t.url.startsWith('data:image/')) { POSTER_DATA_URL = t.url; }
+  else { POSTER_DATA_URL=''; }
   renderPoster();
 
   $('#tourStart').value= toInputDateOnly(t?.start);
@@ -647,7 +647,7 @@ async function doSave(){
   const base={
     tourId:($('#tourId').value||'').trim(),
     name,
-    url:($('#tourUrl').value||'').trim(),    // 안내 페이지 URL
+    url:($('#tourUrl').value||'').trim(),
     start: $('#tourStart').value || '',
     end:   $('#tourEnd').value   || '',
     regStart: $('#regStart').value || '',
@@ -658,19 +658,12 @@ async function doSave(){
     places:  getPlaces(),
     adminCode
   };
-
-  // [FIX] 포스터 저장 매핑: 체크 시 poster(데이터URL), 미체크 시 posterUrl(링크/데이터URL)
-  if (POSTER_DATA_URL){
-    if (document.getElementById('posterEmbed').checked){
-      base.poster = POSTER_DATA_URL;     // 시트 poster 칼럼
-    } else {
-      base.posterUrl = POSTER_DATA_URL;  // 시트 posterUrl 칼럼
-    }
-  }
+  if (POSTER_DATA_URL && (document.getElementById('posterEmbed').checked || !base.url)){ base.url = POSTER_DATA_URL; }
 
   const payload = {
     ...base,
-    // 구버전 호환 필드 유지
+    posterDataUrl: POSTER_DATA_URL || '',
+    // 구버전 호환
     'reg.start': base.regStart, 'reg.end': base.regEnd,
     reg_start: base.regStart,   reg_end: base.regEnd,
     regStartDate: base.regStart, regEndDate: base.regEnd,
@@ -705,8 +698,10 @@ async function doDelete(){
 
   const payload={ tourId: CURRENT_TOUR_ID, adminCode };
   try{
-    // [FIX] 서버는 removetournament 이므로 우선 시도 + 구버전(deleteTournament)도 함께 시도
-    const j = await postJSONCompat([...pathVariants('removeTournament'), ...pathVariants('deleteTournament')], payload);
+    const j = await postJSONCompat(
+      [...pathVariants('removeTournament'), ...pathVariants('deleteTournament')],
+      payload
+    );
     if (!isSuccessResponse(j)) {
       const msg = j?.error || j?.message || j?.msg || '서버 응답을 이해할 수 없습니다.';
       return alert('삭제 실패: ' + msg);
