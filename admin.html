@@ -274,7 +274,6 @@ async function postJSONCompat(paths, payload){
       body: bodyText,
       cache:'no-store',
       redirect:'follow',
-      keepalive:true,
       credentials:'omit',
       mode:'cors'
     });
@@ -287,7 +286,6 @@ async function postJSONCompat(paths, payload){
       body: 'payload='+encodeURIComponent(bodyText),
       cache:'no-store',
       redirect:'follow',
-      keepalive:true,
       credentials:'omit',
       mode:'cors'
     });
