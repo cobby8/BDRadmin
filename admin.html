@@ -15,7 +15,7 @@
   h1{font-size:20px;margin:0}
   .card{background:var(--card);border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:16px;margin-top:16px}
   .row{display:grid;gap:12px}
-  @media(min-width:720px){ .row-2{grid-template-columns:1.2fr 2fr} .row-3{grid-template-columns:1fr 1fr 1fr} }
+  @media(min-width:720px){ .row-2{grid-template-columns:1.2fr 2fr} .row-3{grid-template-columns1fr 1fr 1fr} }
   label{display:block;font-weight:600;margin:10px 0 6px}
   input,select,textarea{width:100%;padding:12px;border:1px solid #e6ecf5;border-radius:12px;font-size:14px;outline:none;background:#fff}
   input:focus,select:focus,textarea:focus{border-color:var(--blue)}
@@ -40,14 +40,16 @@
   .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:16px}
   .offscreen{position:absolute;left:-9999px;opacity:0;width:0;height:0;pointer-events:none}
 
+  /* ===== 목록 테이블 ===== */
   table{width:100%;border-collapse:separate;border-spacing:0 10px;table-layout:fixed}
-  col.col-tournament{width:18%}
-  col.col-region{width:16%}
-  col.col-team{width:28%}
+  /* [FIX] 총합 96%로 축소 → 수평 스크롤 방지 */
+  col.col-tournament{width:17%}
+  col.col-region{width:15%}
+  col.col-team{width:24%}       /* [FIX] 28% → 24% */
   col.col-catdiv{width:14%}
   col.col-uniform{width:10%}
   col.col-created{width:10%}
-  col.col-actions{width:4%}
+  col.col-actions{width:6%}     /* [FIX] 4% → 6% */
   th{font-size:12px;color:#5b6472;text-align:left;padding:0 10px}
   td{background:#fff;padding:12px 10px;border-top:1px solid #eef2f7;border-bottom:1px solid #eef2f7;vertical-align:top}
   tr td:first-child{border-left:1px solid #eef2f7;border-radius:12px 0 0 12px}
@@ -65,9 +67,10 @@
   .pop-actions{display:flex;gap:8px;justify-content:flex-end;padding:10px 12px;border-top:1px solid #eef2f7}
 
   /* Poster */
-  .poster-preview{display:flex;align-items:center;gap:12px}
+  .poster-preview{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .poster-preview img{max-width:220px;max-height:220px;border-radius:12px;border:1px solid #e6ecf5;object-fit:contain;background:#fff}
-  .poster-drop{border:1px dashed #cbd5e1;border-radius:12px;padding:12px;text-align:center;color:#64748b;cursor:pointer}
+  .poster-drop{border:1px dashed #cbd5e1;border-radius:12px;padding:12px;text-align:center;color:#64748b;cursor:pointer;min-width:240px}
+  .poster-meta{display:flex;gap:8px;align-items:center}
 </style>
 </head>
 <body>
@@ -120,7 +123,7 @@
         <div class="grid">
           <input id="tourId" placeholder="자동생성 (수정 시 고정)" disabled>
           <input id="tourName" placeholder="대회명" data-editable>
-          <input id="tourUrl" placeholder="안내 페이지 URL (선택 또는 포스터 데이터URL)" data-editable inputmode="url" autocomplete="off" spellcheck="false">
+          <input id="tourUrl" placeholder="안내 페이지 URL (선택)" data-editable inputmode="url" autocomplete="off" spellcheck="false">
         </div>
 
         <label class="muted" style="margin-top:8px">종별 설정</label>
@@ -142,12 +145,13 @@
 
         <div class="hr"></div>
 
-        <!-- 포스터 업로드 -->
+        <!-- 포스터 업로드/미리보기 -->
         <label>대회 포스터</label>
         <div class="poster-preview" id="posterPreview"></div>
         <div class="toolbar" style="justify-content:space-between;margin-top:6px">
-          <div class="muted">
-            <label><input type="checkbox" id="posterEmbed"> 시트 url에 저장(데이터URL)</label>
+          <div class="poster-meta">
+            <label><input type="checkbox" id="posterEmbed"> DataURL로 저장(권장 X)</label>
+            <span class="muted">※ 미체크 시 서버가 Drive에 업로드하고 링크/ID만 저장합니다.</span>
           </div>
           <div class="toolbar">
             <button class="btn" id="posterCopy" disabled>주소 복사</button>
@@ -229,7 +233,7 @@
 <script>
 /* ========= 상수 ========= */
 const WEB_APP_URL='https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
-const APPLY_BASE ='https://bdrjoin.netlify.app/';
+const VIEWER_BASE='./teamview.html';              // [NEW] TeamView 전용 뷰어 페이지
 
 /* ========= 상태 점 ========= */
 function setHealth(color, tip){ const dot=document.getElementById('healthDot'); dot.style.color=color; if(tip) dot.title=tip||''; }
@@ -255,47 +259,50 @@ function statusBadgeHtml(st){ const m={'접수중':{bg:'#ecfdf5',bd:'#d1fae5',fg
 const truthyFlag = (v)=>{ if (v===true || v===1) return true; if (typeof v==='string') { const s=v.trim().toLowerCase(); if (['true','ok','success','done','1','yes'].includes(s)) return true; } return false; };
 const isSuccessResponse = (j)=>{ if (!j || typeof j!=='object') return false; if (truthyFlag(j.ok) || truthyFlag(j.success) || truthyFlag(j.status) || truthyFlag(j.result)) return true; if (j.rows!==undefined) return true; if (j.tourId || j.id || (j.data && (j.data.tourId || j.data.id))) return true; if (Number.isFinite(j.affectedRows) || Number.isFinite(j.updated) || Number.isFinite(j.inserted) || Number.isFinite(j.count)) return true; return false; };
 function pathVariants(path){ const base=String(path||''); const low=base.toLowerCase(); const pascal=base.slice(0,1).toUpperCase()+base.slice(1); const snake=base.replace(/([A-Z])/g,'_$1').replace(/^_/,'').toLowerCase(); const kebab=snake.replace(/_/g,'-'); const upper=low.toUpperCase(); return [...new Set([base, low, pascal, snake, kebab, upper])]; }
-
-/* ========= API ========= */
 function apiUrl(path,q={}){ 
   let base=(conf.appUrl||'').trim(); if(!validWebAppUrl(base)){ base=WEB_APP_URL; conf.appUrl=base; store.save(conf); }
   const u=new URL(base); u.searchParams.set('path', path); Object.entries(q).forEach(([k,v])=>u.searchParams.set(k,v)); return u.toString();
 }
-async function getJSON(u){
-  const r=await fetch(u,{cache:'no-store',mode:'cors',credentials:'omit'});
-  const t=await r.text();
-  try{ return JSON.parse(t); }
-  catch{ throw new Error('JSON 파싱 실패'); }
-}
+
+/* [FIX] POST 전송기 — preflight 없는 text/plain → 실패 시 urlencoded(payload=)로 폴백 */
 async function postJSONCompat(paths, payload){
-  const tryOnce=async(p)=>{
-    const r=await fetch(apiUrl(p),{
+  const bodyText = JSON.stringify(payload||{});
+  const tryTextPlain = async(p)=>{
+    const r = await fetch(apiUrl(p), {
       method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify(payload||{}),
-      mode:'cors',
-      credentials:'omit'
+      headers:{'Content-Type':'text/plain'},      /* charset 제거: preflight 방지 */
+      body: bodyText,
+      cache:'no-store',
+      redirect:'follow',
+      keepalive:true,
+      credentials:'omit',
+      mode:'cors'
     });
-    const t=await r.text();
-    try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); }
+    const t=await r.text(); try{ return JSON.parse(t); }catch{ return {ok:false,error:t||'JSON 파싱 실패'}; }
   };
-  let lastError=null, lastResp=null;
-  for(const p of paths){
-    try{
-      const j=await tryOnce(p);
-      lastResp=j;
-      if (isSuccessResponse(j) || j?.error!==undefined || j?.message!==undefined || j?.msg!==undefined) {
-        return j;
-      }
-    }catch(e){ lastError=e; }
+  const tryUrlEncoded = async(p)=>{
+    const r = await fetch(apiUrl(p), {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'payload='+encodeURIComponent(bodyText),
+      cache:'no-store',
+      redirect:'follow',
+      keepalive:true,
+      credentials:'omit',
+      mode:'cors'
+    });
+    const t=await r.text(); try{ return JSON.parse(t); }catch{ return {ok:false,error:t||'JSON 파싱 실패'}; }
+  };
+  let last=null;
+  for (const p of paths){
+    try{ const j=await tryTextPlain(p); last=j; if (isSuccessResponse(j) || j.error!==undefined) return j; }catch(e){ last={ok:false,error:String(e?.message||e)}; }
+    try{ const j=await tryUrlEncoded(p); last=j; if (isSuccessResponse(j) || j.error!==undefined) return j; }catch(e){ last={ok:false,error:String(e?.message||e)}; }
   }
-  if (lastResp) return lastResp;
-  if (lastError) throw lastError;
-  return { ok:false, error:'unknown' };
+  return last||{ok:false,error:'unknown'};
 }
-async function postJSON(path,payload){
-  const candidates = pathVariants(path);
-  return postJSONCompat(candidates, payload);
+async function getJSON(u){
+  const r=await fetch(u,{cache:'no-store',mode:'cors',credentials:'omit',redirect:'follow'});
+  const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); }
 }
 
 /* ========= Floating core ========= */
@@ -333,7 +340,7 @@ function openAdminCodeFloating(onOk){
 }
 
 /* ========= 목록 ========= */
-let TOURS={}, TOUR_ARRAY=[];
+let TOURS={}, TOUR_ARRAY=[], CURRENT_TOUR_ID='', CURRENT_TOUR_OBJ=null;
 async function health(){ try{ setHealth('#3b82f6','연결 확인 중…'); const j=await getJSON(apiUrl('health')); if(j && (j.ok || j.status==='ok' || j.success || j.rows!==undefined)){ setHealth('#22c55e','연결 정상'); return true; } setHealth('#ef4444','health 비정상'); return false; }catch(e){ setHealth('#ef4444','연결 실패'); return false; } }
 
 async function loadTournaments(){
@@ -356,6 +363,7 @@ function renderTournamentList(){
     el.addEventListener('click', async ()=>{
       if(!(await confirmDiscardIfDirty())) return;
       const id=el.getAttribute('data-id'); const t=TOURS[id];
+      CURRENT_TOUR_OBJ=t||null;
       loadTourToForm(t,true);
       $('#editBtn').disabled=false;
       $('#tourFilter').value=id;
@@ -396,7 +404,7 @@ function normalizeTeamRow(r){
   };
 }
 function rowTeam(v){
-  const openBtn = `<a href="#" class="btn primary open-edit" data-id="${v.teamId}" data-code="${v.editCode}" title="신청서 새창 열기">열기</a>`;
+  const openBtn = `<a href="#" class="btn primary open-view" data-id="${v.teamId}" title="TeamView(새 탭)">열기</a>`;  /* [FIX] viewer.html로 연결 */
   return `<tr>
     <td class="ellipsis" title="${v.tourName||''}">${v.tourName||'-'}</td>
     <td class="ellipsis" title="${v.region||''}">${v.region||'-'}</td>
@@ -421,13 +429,14 @@ async function loadTeams(){
   }
   $('#teamsTbody').innerHTML=rows.map(r=>rowTeam(normalizeTeamRow(r))).join('') || `<tr><td colspan="7" class="muted">데이터 없음</td></tr>`;
 }
+/* [FIX] 열기 → viewer.html */
 document.getElementById('teamsTbody').addEventListener('click', (e)=>{
-  const open=e.target.closest('.open-edit'); if(open){ e.preventDefault(); const id=open.dataset.id||''; const code=open.dataset.code||''; if(!(id&&code)) return alert('편집 정보가 없습니다.'); const url=`${APPLY_BASE}?edit=${encodeURIComponent(id)}&code=${encodeURIComponent(code)}`; window.open(url,'_blank','noopener'); }
+  const open=e.target.closest('.open-view'); if(open){ e.preventDefault(); const id=open.dataset.id||''; if(!id) return; const url=`${VIEWER_BASE}?teamId=${encodeURIComponent(id)}`; window.open(url,'_blank','noopener'); }
 });
 
 /* ========= 상태/잠금 ========= */
 let DIV_STATE=[];
-let FORM_LOCKED=true, DIRTY=false, CURRENT_TOUR_ID='';
+let FORM_LOCKED=true, DIRTY=false;
 function setLocked(locked){
   FORM_LOCKED=locked;
   const area=$('#formArea');
@@ -523,11 +532,20 @@ function openPlaceFloating(initName,onApply){
   openPopoverCentered(initName?'장소명 수정':'장소 추가', body, actions);
 }
 
-/* ========= Poster ========= */
-let POSTER_DATA_URL='';
+/* ========= 포스터: 업로드/미리보기 ========= */
+let POSTER_DATA_URL='', POSTER_CLEAR=false;
+function currentPosterFromTour(t){
+  if(!t) return '';
+  const direct=[t.posterUrl,t.poster,t.url].find(u=> typeof u==='string' && /^https?:\/\/|^data:image\//.test(u||''));
+  if(direct) return direct;
+  if(t.posterId) return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(t.posterId)}`;
+  return '';
+}
 function renderPoster(){
   const prev=$('#posterPreview');
-  if(!POSTER_DATA_URL){
+  const existing = currentPosterFromTour(CURRENT_TOUR_OBJ);
+  const showUrl = POSTER_DATA_URL || (POSTER_CLEAR ? '' : existing);
+  if(!showUrl){
     prev.innerHTML = `
       <div class="poster-drop" id="posterDrop">
         이미지를 드래그하거나 클릭해 업로드
@@ -536,7 +554,7 @@ function renderPoster(){
     $('#posterCopy').disabled=true; $('#posterClear').disabled=true;
     wirePosterInteractions();
   }else{
-    prev.innerHTML = `<img src="${POSTER_DATA_URL}" alt="poster"><div class="muted">업로드 완료</div>`;
+    prev.innerHTML = `<img src="${showUrl}" alt="poster"><div class="muted">${POSTER_DATA_URL?'업로드(미저장)':'현재 저장된 포스터'}</div>`;
     $('#posterCopy').disabled=false; $('#posterClear').disabled=false;
   }
 }
@@ -551,10 +569,10 @@ function wirePosterInteractions(){
   input.addEventListener('change', e=>{ const f=e.target.files?.[0]; if(f) handlePosterFile(f); });
 }
 async function handlePosterFile(file){
-  try{ POSTER_DATA_URL = await fileToJpegDataUrl(file, 1280, 0.85); renderPoster(); }
+  try{ POSTER_DATA_URL = await fileToJpegDataUrl(file, 1024, 0.8); POSTER_CLEAR=false; renderPoster(); markDirty(); }
   catch(e){ alert('이미지 처리 중 오류: '+e.message); }
 }
-async function fileToJpegDataUrl(file, maxW=1280, q=0.85){
+async function fileToJpegDataUrl(file, maxW=1024, q=0.8){
   const readAsDataURL=f=>new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(f); });
   const src=await readAsDataURL(file);
   const img=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
@@ -562,8 +580,8 @@ async function fileToJpegDataUrl(file, maxW=1280, q=0.85){
   const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; canvas.getContext('2d').drawImage(img,0,0,w,h);
   return canvas.toDataURL('image/jpeg', q);
 }
-document.getElementById('posterCopy').addEventListener('click', async ()=>{ if(!POSTER_DATA_URL) return; try{ await navigator.clipboard.writeText(POSTER_DATA_URL); alert('복사되었습니다.'); }catch{ alert('복사 실패'); } });
-document.getElementById('posterClear').addEventListener('click', ()=>{ POSTER_DATA_URL=''; renderPoster(); });
+document.getElementById('posterCopy').addEventListener('click', async ()=>{ const url=currentPosterFromTour(CURRENT_TOUR_OBJ) || POSTER_DATA_URL; if(!url) return; try{ await navigator.clipboard.writeText(url); alert('복사되었습니다.'); }catch{ alert('복사 실패'); } });
+document.getElementById('posterClear').addEventListener('click', ()=>{ POSTER_DATA_URL=''; POSTER_CLEAR=true; renderPoster(); markDirty(); });
 
 /* ========= 로드/저장 ========= */
 function updateStatusBadge(){ const rs=$('#regStart').value||''; const re=$('#regEnd').value||''; $('#tourStatusBadge').innerHTML=statusBadgeHtml(calcStatus(rs,re)); }
@@ -573,16 +591,13 @@ function pickFirst(obj, keys){ for(const k of keys){ if(obj && obj[k]) return ob
 
 function loadTourToForm(t, locked=true){
   const id = t?.tourId || t?.TourID || '';
-  CURRENT_TOUR_ID=id;
+  CURRENT_TOUR_ID=id; CURRENT_TOUR_OBJ=t||null;
   $('#tourFormTitle').textContent = t ? '대회 수정 (읽기 전용)' : '대회 등록';
   $('#tourId').value   = id;
   $('#tourName').value = t?.name || '';
   $('#tourUrl').value  = t?.url  || '';
 
-  // poster: 데이터URL이면 미리보기
-  if (typeof t?.url==='string' && t.url.startsWith('data:image/')) { POSTER_DATA_URL = t.url; }
-  else { POSTER_DATA_URL=''; }
-  renderPoster();
+  renderPoster();  // [FIX] posterUrl/posterId/dataURL 모두 고려
 
   $('#tourStart').value= toInputDateOnly(t?.start);
   $('#tourEnd').value  = toInputDateOnly(t?.end);
@@ -600,9 +615,10 @@ function loadTourToForm(t, locked=true){
 }
 
 function clearTourForm(){
-  CURRENT_TOUR_ID=''; $('#tourFormTitle').textContent='대회 등록';
+  CURRENT_TOUR_ID=''; CURRENT_TOUR_OBJ=null;
+  $('#tourFormTitle').textContent='대회 등록';
   ['tourId','tourName','tourUrl','tourStart','tourEnd','regStart','regEnd','adminCode'].forEach(id=>$('#'+id).value='');
-  POSTER_DATA_URL=''; renderPoster();
+  POSTER_DATA_URL=''; POSTER_CLEAR=false; renderPoster();
   DIV_STATE=[]; refreshDivUI(); setPlaces([]);
   updateStatusBadge();
   DIRTY=false; setLocked(false);
@@ -623,7 +639,7 @@ async function doSave(){
   const base={
     tourId:($('#tourId').value||'').trim(),
     name,
-    url:($('#tourUrl').value||'').trim(),
+    url:($('#tourUrl').value||'').trim(),            // 안내 페이지 URL만 저장
     start: $('#tourStart').value || '',
     end:   $('#tourEnd').value   || '',
     regStart: $('#regStart').value || '',
@@ -632,31 +648,36 @@ async function doSave(){
     divSets:  DIV_STATE,
     divs,
     places:  getPlaces(),
-    adminCode
+    adminCode,
+    posterClear: POSTER_CLEAR ? true : undefined,   // [NEW]
+    // reg.* 구버전 호환
+    'reg.start': $('#regStart').value || '', 'reg.end': $('#regEnd').value || '',
+    reg_start: $('#regStart').value || '',   reg_end: $('#regEnd').value || '',
+    regStartDate: $('#regStart').value || '', regEndDate: $('#regEnd').value || '',
+    'reg.start.date': $('#regStart').value || '', 'reg.end.date': $('#regEnd').value || '',
+    divs_json: JSON.stringify(divs)
   };
-  if (POSTER_DATA_URL && (document.getElementById('posterEmbed').checked || !base.url)){ base.url = POSTER_DATA_URL; }
-
-  const payload = {
-    ...base,
-    posterDataUrl: POSTER_DATA_URL || '',
-    // 구버전 호환
-    'reg.start': base.regStart, 'reg.end': base.regEnd,
-    reg_start: base.regStart,   reg_end: base.regEnd,
-    regStartDate: base.regStart, regEndDate: base.regEnd,
-    'reg.start.date': base.regStart, 'reg.end.date': base.regEnd,
-    divs_json: JSON.stringify(base.divs)
-  };
+  if (POSTER_DATA_URL){
+    if ($('#posterEmbed').checked) {
+      // 소용량 DataURL만 권한상 허용. (대용량은 Drive 업로드 권장)
+      base.posterDataUrl = POSTER_DATA_URL;
+    } else {
+      // DataURL 전송 → 서버에서 Drive 업로드 후 posterId 저장
+      base.posterDataUrl = POSTER_DATA_URL;
+    }
+  }
 
   try{
-    const j=await postJSON('upsertTournament', payload);
+    const j=await postJSONCompat(pathVariants('upsertTournament'), base);
     if (!isSuccessResponse(j)) {
       const msg = j?.error || j?.message || j?.msg || '서버 응답을 이해할 수 없습니다.';
       return alert('저장 실패: ' + msg);
     }
     await loadTournaments();
-    if(j.tourId) $('#tourId').value=j.tourId;
+    if(j.tourId){ $('#tourId').value=j.tourId; CURRENT_TOUR_ID=j.tourId; CURRENT_TOUR_OBJ=TOURS[j.tourId]||CURRENT_TOUR_OBJ; }
     alert('저장되었습니다.');
-    DIRTY=false; setLocked(true); $('#tourFormTitle').textContent='대회 수정 (읽기 전용)';
+    POSTER_DATA_URL=''; POSTER_CLEAR=false; DIRTY=false; setLocked(true); $('#tourFormTitle').textContent='대회 수정 (읽기 전용)';
+    renderPoster();
   }catch(e){
     alert('저장 실패: ' + (e?.message || e));
   }
@@ -666,9 +687,7 @@ async function doSave(){
 async function doDelete(){
   if(!CURRENT_TOUR_ID) return alert('삭제할 대회가 없습니다.');
   let adminCode=($('#adminCode').value||'').trim();
-  if(!adminCode){
-    return openAdminCodeFloating(()=> doDelete());
-  }
+  if(!adminCode) return openAdminCodeFloating(()=> doDelete());
   const name = ($('#tourName').value||'').trim();
   if(!confirm(`"${name || CURRENT_TOUR_ID}" 대회를 정말 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
 
