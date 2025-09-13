@@ -417,17 +417,45 @@ document.getElementById('teamsTbody').addEventListener('click', (e)=>{
 let DIV_STATE=[];
 let FORM_LOCKED=true, DIRTY=false;
 function setLocked(locked){
-  FORM_LOCKED=locked;
-  const area=$('#formArea');
-  if(locked) area.classList.add('locked'); else area.classList.remove('locked');
-  document.querySelectorAll('[data-editable]').forEach(e=> e.disabled=locked);
-  const admin=$('#adminCode'); if(locked){ admin.setAttribute('readonly',''); } else { admin.addEventListener('focus', ()=> admin.removeAttribute('readonly'), {once:true}); }
-  $('#saveTourBtn').disabled=locked;
-  $('#deleteTourBtn').disabled=locked||!CURRENT_TOUR_ID;
-  $('#addDivSetBtn').disabled=locked;
-  $('#addPlaceBtn').disabled=locked;
-  $('#clearAllDivBtn').disabled=locked || DIV_STATE.length===0;
+  FORM_LOCKED = locked;
+
+  const area = $('#formArea');
+  if (locked) area.classList.add('locked'); else area.classList.remove('locked');
+
+  // 편집 가능/불가
+  document.querySelectorAll('[data-editable]').forEach(e => e.disabled = locked);
+
+  // 관리자 코드 인풋
+  const admin = $('#adminCode');
+  if (locked) { admin.setAttribute('readonly', ''); }
+  else { admin.addEventListener('focus', () => admin.removeAttribute('readonly'), { once: true }); }
+
+  // 주요 버튼
+  $('#saveTourBtn').disabled   = locked;
+  $('#deleteTourBtn').disabled = locked || !CURRENT_TOUR_ID;
+  $('#addDivSetBtn').disabled  = locked;
+  $('#addPlaceBtn').disabled   = locked;
+  $('#clearAllDivBtn').disabled = locked || DIV_STATE.length === 0;
+
+  // ★ 수정 버튼 상태: 편집중이면 비활성화, 읽기 전용이면(locked) 선택된 대회가 있을 때만 활성화
+  const editBtn = $('#editBtn');
+  if (editBtn) {
+    editBtn.disabled = locked ? !CURRENT_TOUR_ID : true;
+  }
 }
+document.getElementById('addPlaceBtn').addEventListener('click', () => {
+  if (FORM_LOCKED) {
+    alert('상단 "수정" 버튼을 눌러 편집을 해제하세요.');
+    return;
+  }
+  // 입력 팝업 후 추가 (UX 일관)
+  openPlaceFloating('', (name) => {
+    const row = makePlaceRow({ name });
+    document.getElementById('placeList').appendChild(row);
+    DIRTY = true;
+  });
+});
+
 function markDirty(){ if(!FORM_LOCKED) DIRTY=true; }
 document.addEventListener('input',(e)=>{ if(e.target.matches('[data-editable]')) markDirty(); });
 window.addEventListener('beforeunload',(e)=>{ if(DIRTY){ e.preventDefault(); e.returnValue=''; }});
