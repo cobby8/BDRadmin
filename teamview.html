@@ -1,1 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BDR TeamView</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#f6f8fb; --card:#fff; --muted:#6b7280; --bd:#e5e7eb; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font-family:'Pretendard','Apple SD Gothic Neo',sans-serif;color:#111}
+  .wrap{max-width:1150px;margin:22px auto;padding:0 14px 48px}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.08);padding:16px}
+  h1{margin:0 0 6px;font-size:22px}
+  .muted{color:var(--muted);font-size:12px}
+  .kv{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:14px;margin-top:4px}
+  .kv b{color:#0f172a}
+  table{width:100%;border-collapse:collapse;margin-top:12px;background:#fff}
+  th,td{border:1px solid var(--bd);padding:8px 10px;font-size:13px;text-align:left}
+  th{background:#f8fafc}
+  .toolbar{display:flex;gap:8px;justify-content:flex-end;margin:10px 0}
+  .btn{padding:8px 12px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1 id="title">TeamView</h1>
+    <div class="kv">
+      <b>대회</b><div id="tourName">-</div>
+      <b>팀</b><div id="teamName">-</div>
+      <b>TeamID</b><div id="teamId">-</div>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="copyBtn">TeamID 복사</button>
+      <button class="btn" id="printBtn">프린트/저장</button>
+    </div>
+    <div style="overflow:auto">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th>PlayerID</th><th>TeamID</th><th>teamNameKo</th><th>teamNameEn</th>
+            <th>선수이름</th><th>등번호</th><th>포지션</th><th>생년월일</th><th>만나이</th><th>선출여부</th><th>등록일시</th><th>출석</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="muted">※ 화면은 구글 시트 <b>TeamView</b>와 동일한 컬럼으로 표시됩니다.</div>
+  </div>
+</div>
+
+<script>
+const WEB_APP_URL='https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
+const qs=new URLSearchParams(location.search); const TEAM_ID=qs.get('teamId')||'';
+
+function api(u){ return fetch(u,{cache:'no-store',mode:'cors',credentials:'omit'}).then(r=>r.json()); }
+function url(path,q={}){ const u=new URL(WEB_APP_URL); u.searchParams.set('path',path); Object.entries(q).forEach(([k,v])=>u.searchParams.set(k,v)); return u.toString(); }
+
+function td(v){ const td=document.createElement('td'); td.textContent=v==null?'':String(v); return td; }
+
+async function boot(){
+  if(!TEAM_ID){ document.getElementById('title').textContent='TeamView (teamId 없음)'; return; }
+  document.getElementById('teamId').textContent=TEAM_ID;
+
+  // 팀/선수 가져오기
+  const t = await api(url('getteam',{teamId:TEAM_ID}));
+  const p = await api(url('players',{teamId:TEAM_ID})); // [NEW] 서버 보강 필요
+
+  if(t?.ok && t.team){
+    document.getElementById('tourName').textContent=t.team.tourName||'-';
+    document.getElementById('teamName').textContent=`${t.team.teamNameKo||'-'} / ${t.team.teamNameEn||'-'}`;
+    document.getElementById('title').textContent = `${t.team.teamNameKo||''} (${t.team.teamNameEn||''})`;
+  }
+  const tb=document.getElementById('tbody'); tb.innerHTML='';
+  const rows = Array.isArray(p?.rows) ? p.rows : [];
+  if(!rows.length){ const tr=document.createElement('tr'); const td1=document.createElement('td'); td1.colSpan=12; td1.textContent='데이터 없음'; tr.appendChild(td1); tb.appendChild(tr); }
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.appendChild(td(r.PlayerID));
+    tr.appendChild(td(r.TeamID));
+    tr.appendChild(td(r.teamNameKo));
+    tr.appendChild(td(r.teamNameEn));
+    tr.appendChild(td(r['선수이름']));
+    tr.appendChild(td(r['등번호']));
+    tr.appendChild(td(r['포지션']));
+    tr.appendChild(td(r['생년월일']));
+    tr.appendChild(td(r['만나이']));
+    tr.appendChild(td(r['선출여부']));
+    tr.appendChild(td(r['등록일시']));
+    tr.appendChild(td(r['출석']));
+    tb.appendChild(tr);
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(TEAM_ID); alert('TeamID가 복사되었습니다.'); }catch{ alert('복사 실패'); }
+  });
+  document.getElementById('printBtn').addEventListener('click', ()=> window.print());
+}
+
+boot();
+</script>
+</body>
+</html>
 
