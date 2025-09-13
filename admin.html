@@ -252,31 +252,9 @@ function calcStatus(rs,re){ if(!rs||!re) return '상태미정'; const s=new Date
 function statusBadgeHtml(st){ const m={'접수중':{bg:'#ecfdf5',bd:'#d1fae5',fg:'#16a34a'},'접수전':{bg:'#eff6ff',bd:'#dbeafe',fg:'#1769ff'},'마감':{bg:'#fef2f2',bd:'#fee2e2',fg:'#ef4444'},'상태미정':{bg:'#f1f5fb',bd:'#e4ecf7',fg:'#334155'}}; const c=m[st]||m['상태미정']; return `<span class="badge" style="background:${c.bg};border-color:${c.bd};color:${c.fg}">${st}</span>`; }
 
 /* ========= API 유틸 ========= */
-const truthyFlag = (v)=>{
-  if (v===true || v===1) return true;
-  if (typeof v==='string') {
-    const s=v.trim().toLowerCase();
-    if (['true','ok','success','done','1','yes'].includes(s)) return true;
-  }
-  return false;
-};
-const isSuccessResponse = (j)=>{
-  if (!j || typeof j!=='object') return false;
-  if (truthyFlag(j.ok) || truthyFlag(j.success) || truthyFlag(j.status) || truthyFlag(j.result)) return true;
-  if (j.rows!==undefined) return true;
-  if (j.tourId || j.id || (j.data && (j.data.tourId || j.data.id))) return true;
-  if (Number.isFinite(j.affectedRows) || Number.isFinite(j.updated) || Number.isFinite(j.inserted) || Number.isFinite(j.count)) return true;
-  return false;
-};
-function pathVariants(path){
-  const base = String(path||'');
-  const low  = base.toLowerCase();
-  const pascal = base.slice(0,1).toUpperCase()+base.slice(1);
-  const snake  = base.replace(/([A-Z])/g,'_$1').replace(/^_/,'').toLowerCase();
-  const kebab  = snake.replace(/_/g,'-');
-  const upper  = low.toUpperCase();
-  return [...new Set([base, low, pascal, snake, kebab, upper])];
-}
+const truthyFlag = (v)=>{ if (v===true || v===1) return true; if (typeof v==='string') { const s=v.trim().toLowerCase(); if (['true','ok','success','done','1','yes'].includes(s)) return true; } return false; };
+const isSuccessResponse = (j)=>{ if (!j || typeof j!=='object') return false; if (truthyFlag(j.ok) || truthyFlag(j.success) || truthyFlag(j.status) || truthyFlag(j.result)) return true; if (j.rows!==undefined) return true; if (j.tourId || j.id || (j.data && (j.data.tourId || j.data.id))) return true; if (Number.isFinite(j.affectedRows) || Number.isFinite(j.updated) || Number.isFinite(j.inserted) || Number.isFinite(j.count)) return true; return false; };
+function pathVariants(path){ const base=String(path||''); const low=base.toLowerCase(); const pascal=base.slice(0,1).toUpperCase()+base.slice(1); const snake=base.replace(/([A-Z])/g,'_$1').replace(/^_/,'').toLowerCase(); const kebab=snake.replace(/_/g,'-'); const upper=low.toUpperCase(); return [...new Set([base, low, pascal, snake, kebab, upper])]; }
 
 /* ========= API ========= */
 function apiUrl(path,q={}){ 
@@ -378,10 +356,10 @@ function renderTournamentList(){
     el.addEventListener('click', async ()=>{
       if(!(await confirmDiscardIfDirty())) return;
       const id=el.getAttribute('data-id'); const t=TOURS[id];
-      loadTourToForm(t,true);                  // 폼 로드
+      loadTourToForm(t,true);
       $('#editBtn').disabled=false;
-      $('#tourFilter').value=id;               // 필터 동기화
-      await loadTeams();                       // 팀표 갱신
+      $('#tourFilter').value=id;
+      await loadTeams();
       document.getElementById('formArea').scrollIntoView({behavior:'smooth', block:'start'});
     });
   });
@@ -443,8 +421,6 @@ async function loadTeams(){
   }
   $('#teamsTbody').innerHTML=rows.map(r=>rowTeam(normalizeTeamRow(r))).join('') || `<tr><td colspan="7" class="muted">데이터 없음</td></tr>`;
 }
-
-/* 표 내 액션: 신청서 열기(새창) */
 document.getElementById('teamsTbody').addEventListener('click', (e)=>{
   const open=e.target.closest('.open-edit'); if(open){ e.preventDefault(); const id=open.dataset.id||''; const code=open.dataset.code||''; if(!(id&&code)) return alert('편집 정보가 없습니다.'); const url=`${APPLY_BASE}?edit=${encodeURIComponent(id)}&code=${encodeURIComponent(code)}`; window.open(url,'_blank','noopener'); }
 });
@@ -698,10 +674,7 @@ async function doDelete(){
 
   const payload={ tourId: CURRENT_TOUR_ID, adminCode };
   try{
-    const j = await postJSONCompat(
-      [...pathVariants('removeTournament'), ...pathVariants('deleteTournament')],
-      payload
-    );
+    const j = await postJSONCompat(pathVariants('deleteTournament'), payload);
     if (!isSuccessResponse(j)) {
       const msg = j?.error || j?.message || j?.msg || '서버 응답을 이해할 수 없습니다.';
       return alert('삭제 실패: ' + msg);
@@ -725,20 +698,9 @@ $('#tourFilter').addEventListener('change', async ()=>{ if(!(await confirmDiscar
 $('#searchBtn').addEventListener('click', loadTeams);
 $('#searchText').addEventListener('keydown', e=>{ if(e.key==='Enter') loadTeams(); });
 
-// 저장/삭제/장소추가/종별 전체삭제 버튼 연결
 document.getElementById('saveTourBtn').addEventListener('click', doSave);
 document.getElementById('deleteTourBtn').addEventListener('click', doDelete);
-document.getElementById('addPlaceBtn').addEventListener('click', ()=> {
-  if (FORM_LOCKED){ alert('상단 "수정" 버튼으로 편집을 해제하세요.'); return; }
-  openPlaceFloating('', (name)=>{ const row=makePlaceRow({name}); $('#placeList').appendChild(row); DIRTY=true; });
-});
-document.getElementById('clearAllDivBtn').addEventListener('click', ()=> {
-  if (FORM_LOCKED) return;
-  if(!DIV_STATE.length) return;
-  if(confirm('모든 구분/종별을 삭제할까요?')){ DIV_STATE=[]; DIRTY=true; refreshDivUI(); }
-});
 
-/* ========= 부트 ========= */
 (async function boot(){ await health(); await loadTournaments(); await loadTeams(); renderPoster(); })();
 </script>
 </body>
