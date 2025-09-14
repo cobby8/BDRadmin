@@ -35,17 +35,19 @@
 
   .table-wrap{overflow:auto;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:10px}
   table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #e6ecf5;border-radius:12px;table-layout:fixed}
-
-  /* === 가운데 정렬(요청 #1) === */
-  thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:center;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
-  tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff;text-align:center}
-
+  thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:left;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
+  tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff}
   tbody tr:last-child td{border-bottom:none}
 
-  /* === 열 폭 재배치(이전 단계 반영 유지) === */
-  col.col-teamko{width:12.6%}  /* 한글팀명 (기존 teamNameKo 70%) */
-  col.col-teamen{width:12.6%}  /* 영문팀명 (기존 teamNameEn 70%) */
-  col.col-pname{width:10.8%}   /* 선수이름 (기존 60%) */
+  /* === 열 폭 재배치 (요청 반영) ===
+     - teamNameKo: 18% → 12.6% (70%)
+     - teamNameEn: 18% → 12.6% (70%)
+     - 선수이름:   18% → 10.8% (60%)
+     - 나머지 열로 18%p 재분배
+   */
+  col.col-teamko{width:12.6%}
+  col.col-teamen{width:12.6%}
+  col.col-pname{width:10.8%}
   col.col-no{width:10%}
   col.col-pos{width:9%}
   col.col-birth{width:20%}
@@ -54,6 +56,8 @@
   col.col-attend{width:8%}
 
   td,th{word-break:keep-all; overflow-wrap:anywhere; line-height:1.35}
+  .t-center{text-align:center}
+  .t-right{text-align:right}
   .nowrap{white-space:nowrap}
 
   /* 출석 체크 상태에 따라 행 강조(화면에서만) */
@@ -71,7 +75,7 @@
     header, .screen-only{display:none !important}
     .table-wrap{box-shadow:none;border:0;padding:0}
     table{border:0;border-spacing:0}
-    thead th, tbody td{border:1px solid #ddd; text-align:center !important}
+    thead th, tbody td{border:1px solid #ddd}
     thead th{background:#f3f4f6 !important;-webkit-print-color-adjust:exact; print-color-adjust:exact}
     /* 출석 체크되지 않은 행은 인쇄에서 제외 */
     tbody tr:not(.attend-checked){display:none}
@@ -126,15 +130,15 @@
       </colgroup>
       <thead>
         <tr>
-          <th>한글팀명</th>
-          <th>영문팀명</th>
+          <th>teamNameKo</th>
+          <th>teamNameEn</th>
           <th>선수이름</th>
           <th class="nowrap">등번호</th>
           <th class="nowrap">포지션</th>
           <th class="nowrap">생년월일<br><span class="muted">(YYYY-MM-DD)</span></th>
           <th class="nowrap">만나이</th>
-          <th class="nowrap">선출</th>
-          <th class="nowrap">출석</th>
+          <th class="nowrap">선출여부</th>
+          <th class="nowrap t-center">출석</th>
         </tr>
       </thead>
       <tbody id="tbody">
@@ -296,12 +300,12 @@ function rowHtml(v, idx){
       <td>${v.teamNameKo||''}</td>
       <td>${v.teamNameEn||''}</td>
       <td>${v.playerName||''}</td>
-      <td class="nowrap">${v.backNumber||''}</td>
-      <td class="nowrap">${v.position||''}</td>
-      <td class="nowrap">${v.birthYMD||''}</td>
-      <td class="nowrap">${v.age||''}</td>
-      <td class="nowrap">${v.elite||''}</td>
-      <td class="nowrap">
+      <td class="t-center nowrap">${v.backNumber||''}</td>
+      <td class="t-center nowrap">${v.position||''}</td>
+      <td class="t-center nowrap">${v.birthYMD||''}</td>
+      <td class="t-center nowrap">${v.age||''}</td>
+      <td class="t-center nowrap">${v.elite||''}</td>
+      <td class="t-center nowrap">
         <input type="checkbox" class="attend-box" data-idx="${idx}">
         <span class="attend-mark print-only">✓</span>
       </td>
@@ -347,7 +351,7 @@ function updateSelectedCount(players){
     const rawPlayers = await fetchPlayersOfTeam(teamId);
     let players = rawPlayers.map(p=>normalizePlayer(p, team));
 
-    // (이전 단계) 등번호 오름차순 정렬 유지
+    // ▶ 등번호 오름차순 정렬 (요청 반영)
     players.sort((a,b)=>{
       const an = a._sortBackNum, bn = b._sortBackNum;
       if(an==null && bn==null){
@@ -364,7 +368,7 @@ function updateSelectedCount(players){
     renderTable(players);
     updateSelectedCount(players);
 
-    // 상단 "출석 전체선택"
+    // 상단 "출석 전체선택"만 유지
     const toggleAll = (checked)=>{
       const cbs = document.querySelectorAll('.attend-box');
       cbs.forEach((cb, i)=>{
@@ -377,7 +381,7 @@ function updateSelectedCount(players){
     };
     $('#checkAll')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
 
-    // 새로고침 & 프린트/저장
+    // 새로고침 & 프린트/저장 (우측 배치 유지)
     $('#reloadBtn')?.addEventListener('click', ()=>location.reload());
     $('#printBtn')?.addEventListener('click', ()=>window.print());
 
