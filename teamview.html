@@ -203,22 +203,21 @@ function bindAttend(players){
     $('#teamNameKo').textContent = team.teamNameKo || '(팀명 미기입)';
     $('#teamNameEn').textContent = team.teamNameEn || team.teamCode || '';
 
-    // 선수 (단일 경로만 호출 → 빠름)
-    let j = await fetchJSON(apiUrl('players',{teamId}));
-    if (!j?.ok) throw new Error(j?.error || 'players API error');
+// 선수 (표준 경로)
+let j = await fetchJSON(apiUrl('players',{teamId}));
 
-    // 서버가 0건이면, 마지막 1회 폴백: 전체 받아서 클라 필터
-    if ((j.rows||[]).length===0){
-      const all = await fetchJSON(apiUrl('players'));
-      const allRows = Array.isArray(all?.rows)?all.rows:[];
-      // teamNameKo / teamNameEn / code 근사 매칭
-      const canon = s=>String(s||'').toLowerCase().replace(/[\s_\-]/g,'');
-      const names = [team.teamNameKo, team.teamNameEn, team.teamCode].filter(Boolean).map(canon);
-      j.rows = allRows.filter(r=>{
-        const v = canon(r.teamNameKo || r['team_name_ko'] || r['한글팀명'] || r.teamNameEn || r['영문팀명'] || r['team'] || r['팀'] || r['팀명'] || r['teamCode'] || r['팀코드']);
-        return v && names.includes(v);
-      });
-    }
+// ▶ 폴백: unknown path면 legacy 별칭 한 번만 시도(속도 영향 최소화, 3초 타임아웃)
+if (!j?.ok && String(j?.error||'').includes('unknown path')) {
+  const legacy = ['teamplayers','team_players','roster','playerlist','getplayers'];
+  for (const p of legacy) {
+    try {
+      j = await fetchJSON(apiUrl(p,{teamId}), 3000);
+      if (j?.ok) break;
+    } catch(_) {}
+  }
+}
+if (!j?.ok) throw new Error(j?.error || 'players API error');
+
 
     const players = (j.rows||[]).map(p=>normalizePlayer(p, team));
     players.sort((a,b)=>{
