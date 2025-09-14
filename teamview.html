@@ -153,25 +153,86 @@
 </div>
 
 <script>
-/* ========= 상수/설정 ========= */
-const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
+/* ========= 상수/저장 ========= */
+/* 기본값을 하드코딩하지 않음: 동적으로 추론 + 쿼리/로컬스토리지 우선 */
+const DEFAULT_WEB_APP_URL = ''; // 미설정 시 현재 실행 URL 또는 google.script.run 사용
 const CONF_KEY='BDR_ADMIN_CONF_V2';
-const store={ load(){ try{ return JSON.parse(localStorage.getItem(CONF_KEY)||'{}'); }catch{return{};} } };
-function validWebAppUrl(u){ return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(\?.*)?$/i.test((u||'').trim()); }
-let conf=store.load(); let WEB_APP_URL = validWebAppUrl(conf.appUrl)?conf.appUrl:DEFAULT_WEB_APP_URL;
+const store={ 
+  load(){ try{ return JSON.parse(localStorage.getItem(CONF_KEY)||'{}'); }catch{return{};} } 
+};
 
-function setHealth(color, tip){ const dot=document.getElementById('healthDot'); if(!dot) return; dot.style.color=color; dot.title=tip||''; }
-
-/* ========= 유틸 ========= */
+/* ========= 기본 유틸 ========= */
 const $=s=>document.querySelector(s);
 const pad=n=>String(n).padStart(2,'0');
-function apiUrl(path,q={}){ const u=new URL(WEB_APP_URL); u.searchParams.set('path', path); Object.entries(q||{}).forEach(([k,v])=>u.searchParams.set(k,v)); return u.toString(); }
-async function getJSON(u){ const r=await fetch(u,{cache:'no-store',mode:'cors'}); const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); } }
-const truthyFlag=(v)=>{ if (v===true||v===1) return true; if(typeof v==='string'){ const s=v.trim().toLowerCase(); if(['true','ok','success','done','1','yes','y','o','on','t','확인','예','선출','유','o','O'].includes(s)) return true; } return false; };
-
+function setHealth(color, tip){ const dot=$('#healthDot'); if(!dot) return; dot.style.color=color; dot.title=tip||''; }
 function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name)||''; }
+function validWebAppUrl(u){ return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(\?.*)?$/i.test((u||'').trim()); }
 
-/* 날짜 파싱/포맷 */
+/* ========= API 베이스 URL 결정 ========= */
+function resolveBaseUrl(){
+  // 1) ?api= 쿼리 우선
+  const apiQ = getParam('api') || getParam('base') || getParam('endpoint');
+  if (validWebAppUrl(apiQ)) return apiQ.trim();
+
+  // 2) 로컬 스토리지
+  const conf = store.load();
+  if (validWebAppUrl(conf.appUrl)) return conf.appUrl.trim();
+
+  // 3) 현재 페이지가 Apps Script 웹앱(…/exec)라면 그 자체를 사용
+  try{
+    const m = location.href.match(/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/i);
+    if (m) return m[0];
+  }catch(e){}
+
+  // 4) 마지막 폴백 (가능하면 비워놓고 google.script.run 사용)
+  if (validWebAppUrl(DEFAULT_WEB_APP_URL)) return DEFAULT_WEB_APP_URL.trim();
+
+  return ''; // 비어있으면 g.s.run 브리지 사용
+}
+let WEB_APP_URL = resolveBaseUrl();
+
+/* ========= API 호출: g.s.run 우선, fetch 폴백 ========= */
+function runHtmlApi(path, params){
+  return new Promise((resolve, reject)=>{
+    try{
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(err=>reject(new Error(err && err.message || String(err))))
+        .appApi(Object.assign({path}, params||{}));
+    }catch(e){
+      reject(e);
+    }
+  });
+}
+
+async function apiGet(path, q={}){
+  // 1) 동일 프로젝트에서 실행 중이면 CORS 없이 브리지 호출 (가장 안정적)
+  if (typeof google !== 'undefined' && google.script && google.script.run){
+    try{
+      return await runHtmlApi(path, q);
+    }catch(e){
+      // 브리지 실패 시 fetch 폴백
+    }
+  }
+
+  // 2) fetch 호출 (외부 호스팅 등)
+  const base = WEB_APP_URL || resolveBaseUrl();
+  if(!base) throw new Error('API URL 미설정 (api/base 파라미터 또는 localStorage 설정 필요)');
+
+  const u = new URL(base);
+  u.searchParams.set('path', path);
+  Object.entries(q||{}).forEach(([k,v])=>u.searchParams.set(k, v));
+
+  const sameOrigin = (new URL(base)).origin === location.origin;
+  const mode = sameOrigin ? 'same-origin' : 'cors';
+
+  const r = await fetch(u.toString(), {cache:'no-store', mode});
+  const t = await r.text();
+  let j; try{ j = JSON.parse(t); }catch{ throw new Error('API 응답(JSON) 파싱 실패'); }
+  return j;
+}
+
+/* ========= 날짜/데이터 유틸 ========= */
 function parseDateLoose(v){
   if(!v) return null;
   if(v instanceof Date && !isNaN(v)) return v;
@@ -197,12 +258,17 @@ function calcAge(dob, asOf){
   if(m<0 || (m===0 && ref.getDate()<b.getDate())) age--;
   return String(age);
 }
+const truthyFlag=(v)=>{
+  if (v===true||v===1) return true;
+  if(typeof v==='string'){
+    const s=v.trim().toLowerCase();
+    if(['true','ok','success','done','1','yes','y','o','on','t','확인','예','선출','유','o','O'].includes(s)) return true;
+  }
+  return false;
+};
+function pick(o, keys=[], fallback=''){ for(const k of keys){ if(o && o[k]!=null && String(o[k]).trim()!=='') return o[k]; } return fallback; }
 
-/* 데이터 정규화 */
-function pick(o, keys=[], fallback=''){
-  for(const k of keys){ if(o && o[k]!=null && String(o[k]).trim()!=='') return o[k]; }
-  return fallback;
-}
+/* ========= 표준화 ========= */
 function normalizeTeam(t){
   if(!t) return {teamId:'', teamNameKo:'', teamNameEn:''};
   const teamId = pick(t, ['teamId','TeamID','id','Id']);
@@ -211,22 +277,17 @@ function normalizeTeam(t){
   const tourId = pick(t, ['tourId','TourID','tournamentId']);
   return { teamId, teamNameKo, teamNameEn, tourId, raw:t };
 }
-
-/* 숫자 등번호 파싱(정렬용) */
 function parseBackNoToNum(raw){
   const s = String(raw ?? '').trim();
   if(!s) return null;
   if(/^\d+$/.test(s)) return parseInt(s,10);
   return null;
 }
-
 function normalizePlayer(p, team){
-  // 선수이름
   const name = pick(p, [
     'playerName','player_name','player','nameKo','name_ko','name','koreanName','korName',
     'playerNameKo','player_name_ko','선수이름','선수','성명'
   ]);
-  // 등번호
   const backNoRaw = pick(p, [
     'backNumber','backNo','jersey','jerseyNo','jerseyNo_ko','uniformNo','uniform','number','no',
     'jerseyNumber','등번호'
@@ -245,44 +306,51 @@ function normalizePlayer(p, team){
     age: calcAge(birth),
     elite: elite?'O':'',
     attend: false,
-    _sortBackNum: parseBackNoToNum(backNoRaw), // 정렬용 숫자
+    _sortBackNum: parseBackNoToNum(backNoRaw),
     _raw: p
   };
 }
 
-/* API 폴백 로더 */
+/* ========= API 래퍼 ========= */
 async function health(){
   try{
     setHealth('#3b82f6','연결 확인 중…');
-    const j=await getJSON(apiUrl('health'));
-    if(j && (j.ok || j.status==='ok' || j.success || j.rows!==undefined)){ setHealth('#22c55e','연결 정상'); return true; }
-    setHealth('#ef4444','health 비정상'); return false;
-  }catch(e){ setHealth('#ef4444','연결 실패'); return false; }
+    const j=await apiGet('health', {});
+    if(j && (j.ok || j.status==='ok' || j.success || j.rows!==undefined)){
+      setHealth('#22c55e','연결 정상');
+      return true;
+    }
+    setHealth('#ef4444','health 비정상');
+    return false;
+  }catch(e){
+    setHealth('#ef4444','연결 실패: ' + (e?.message||e));
+    return false;
+  }
 }
-
 async function fetchTeamById(teamId){
-  const tryPaths = ['team','getteam','Team'];
+  // 가장 신뢰도 높은 getteam 우선
+  const tryPaths = ['getteam','team','Team'];
   for(const p of tryPaths){
     try{
-      const j=await getJSON(apiUrl(p,{teamId}));
+      const j=await apiGet(p, {teamId});
       const cand = j?.data || j?.team || j?.row;
       if(cand) return normalizeTeam(cand);
     }catch{}
   }
+  // 폴백: 전체 teams 목록에서 찾기
   try{
-    const j=await getJSON(apiUrl('teams'));
+    const j=await apiGet('teams', {});
     const rows=Array.isArray(j?.rows)?j.rows:[];
     const found=rows.find(r=>String(r.teamId||r.TeamID||r.id||'')===String(teamId));
     if(found) return normalizeTeam(found);
   }catch{}
   return {teamId, teamNameKo:'', teamNameEn:''};
 }
-
 async function fetchPlayersOfTeam(teamId){
   const paths=['players','teamplayers','team_players','roster','playerlist','getplayers'];
   for(const p of paths){
     try{
-      const j=await getJSON(apiUrl(p,{teamId}));
+      const j=await apiGet(p, {teamId});
       const rows = Array.isArray(j?.rows) ? j.rows
                  : Array.isArray(j?.players) ? j.players
                  : Array.isArray(j?.data) ? j.data : null;
@@ -292,7 +360,7 @@ async function fetchPlayersOfTeam(teamId){
   return [];
 }
 
-/* 렌더링 */
+/* ========= 렌더링 ========= */
 function rowHtml(v, idx){
   const checkedCls = v.attend ? 'attend-checked' : '';
   return `
@@ -311,7 +379,6 @@ function rowHtml(v, idx){
       </td>
     </tr>`;
 }
-
 function renderTable(players){
   const tbody = $('#tbody');
   tbody.innerHTML = players.map((p,i)=>rowHtml(p,i)).join('') || `<tr><td colspan="9" class="muted">데이터 없음</td></tr>`;
@@ -326,15 +393,15 @@ function renderTable(players){
     });
   });
 }
-
 function updateSelectedCount(players){
   const n = players.filter(p=>p.attend).length;
   $('#selectedCount').textContent = String(n);
 }
 
-/* 메인 로드 */
+/* ========= 부트스트랩 ========= */
 (async function boot(){
   await health().catch(()=>{});
+
   const teamId = getParam('teamId') || '';
   $('#teamIdBadge').textContent = teamId || '-';
   if(!teamId){
@@ -351,24 +418,22 @@ function updateSelectedCount(players){
     const rawPlayers = await fetchPlayersOfTeam(teamId);
     let players = rawPlayers.map(p=>normalizePlayer(p, team));
 
-    // ▶ 등번호 오름차순 정렬 (요청 반영)
+    // 등번호 오름차순 정렬 (숫자 먼저, 그 외 문자열)
     players.sort((a,b)=>{
       const an = a._sortBackNum, bn = b._sortBackNum;
       if(an==null && bn==null){
-        // 둘 다 숫자 아님 → 문자열 오름차순
         return String(a.backNumber||'').localeCompare(String(b.backNumber||''));
       }
-      if(an==null) return 1;   // 숫자 아님은 뒤로
+      if(an==null) return 1;
       if(bn==null) return -1;
-      return an - bn;          // 오름차순
+      return an - bn;
     });
 
     $('#playerCount').textContent = String(players.length);
-
     renderTable(players);
     updateSelectedCount(players);
 
-    // 상단 "출석 전체선택"만 유지
+    // 상단 "출석 전체선택"
     const toggleAll = (checked)=>{
       const cbs = document.querySelectorAll('.attend-box');
       cbs.forEach((cb, i)=>{
@@ -381,7 +446,7 @@ function updateSelectedCount(players){
     };
     $('#checkAll')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
 
-    // 새로고침 & 프린트/저장 (우측 배치 유지)
+    // 새로고침 & 프린트/저장
     $('#reloadBtn')?.addEventListener('click', ()=>location.reload());
     $('#printBtn')?.addEventListener('click', ()=>window.print());
 
