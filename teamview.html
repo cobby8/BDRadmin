@@ -1,353 +1,119 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>TeamView</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{ --blue:#1769ff; --bg:#f6f8fb; --card:#fff; --muted:#6b7684; --green:#16a34a; --ink:#1f2937 }
-  *{box-sizing:border-box} html,body{height:100%}
-  body{margin:0;background:var(--bg);font-family:'Pretendard','Apple SD Gothic Neo',system-ui,-apple-system,sans-serif;color:var(--ink)}
-  .wrap{max-width:1100px;margin:18px auto;padding:0 12px 48px}
-  header{display:flex;justify-content:space-between;align-items:center;margin:10px 0 10px}
-  h1{font-size:18px;margin:0}.muted{color:var(--muted);font-size:12px}
-  .card{background:var(--card);border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:12px}
-  .btn{padding:9px 12px;border-radius:12px;border:1px solid #dfe6ee;background:#fff;cursor:pointer;white-space:nowrap}
-  .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 10px}
-  .team-head{display:flex;flex-direction:column;gap:4px}
-  .team-names{font-size:16px;font-weight:700}.team-names .en{font-weight:600;color:#64748b}
-  .stat{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .badge{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:#334155;background:#f1f5fb;border:1px solid #e4ecf7;border-radius:999px;padding:4px 8px}
-  .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:8px 12px;background:#fff;font-size:13px}
-  .count{font-weight:700}
-  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
-  .actions .btn{height:36px}
-  .table-wrap{overflow:auto;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:10px}
-  table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #e6ecf5;border-radius:12px;table-layout:fixed}
-  thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:center;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
-  tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff;text-align:center}
-  tbody tr:last-child td{border-bottom:none}
-  col.col-teamko{width:12.6%}col.col-teamen{width:12.6%}col.col-pname{width:10.8%}
-  col.col-no{width:10%}col.col-pos{width:9%}col.col-birth{width:20%}
-  col.col-age{width:9%}col.col-elite{width:8%}col.col-attend{width:8%}
-  td,th{word-break:keep-all; overflow-wrap:anywhere; line-height:1.35}.nowrap{white-space:nowrap}
-  tbody tr.attend-checked{background:linear-gradient(0deg, rgba(22,163,74,.06), rgba(22,163,74,.06))}
-  tbody tr.attend-checked td{border-bottom-color:#d1fae5}
-  .print-only{display:none}.screen-only{display:initial}
-  @page{ size:A4 portrait; margin:12mm }
-  @media print{
-    body{background:#fff}.wrap{max-width:none;margin:0;padding:0}
-    header,.screen-only{display:none !important}.table-wrap{box-shadow:none;border:0;padding:0}
-    table{border:0;border-spacing:0}thead th,tbody td{border:1px solid #ddd;text-align:center !important}
-    thead th{background:#f3f4f6 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    tbody tr:not(.attend-checked){display:none}.attend-box{display:none !important}.attend-mark{display:inline !important}
-    tr{break-inside:avoid;page-break-inside:avoid}td.nowrap,th.nowrap{white-space:nowrap !important}
-  }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <h1>TeamView</h1>
-    <span class="muted screen-only" id="healthDot" title="연결상태">●</span>
-  </header>
-
-  <div class="card topbar">
-    <div class="team-head">
-      <div class="team-names">
-        <span id="teamNameKo">팀명(한글)</span>
-        <span class="en" id="teamNameEn">Team Name (EN)</span>
-      </div>
-      <div class="stat">
-        <span class="badge">팀 ID: <span id="teamIdBadge">-</span></span>
-        <span class="pill">선수 <b class="count" id="playerCount">0</b>명</span>
-        <span class="pill">출석 선택 <b class="count" id="selectedCount">0</b>명</span>
-      </div>
-    </div>
-    <div class="actions screen-only">
-      <label class="pill" title="목록 전체 선택/해제">
-        <input type="checkbox" id="checkAll" />&nbsp;출석 전체선택
-      </label>
-      <button class="btn" id="reloadBtn">새로고침</button>
-      <button class="btn primary" id="printBtn">프린트/저장</button>
-    </div>
-  </div>
-
-  <div class="table-wrap">
-    <table id="playerTable" aria-label="팀 선수 목록">
-      <colgroup>
-        <col class="col-teamko"><col class="col-teamen"><col class="col-pname">
-        <col class="col-no"><col class="col-pos"><col class="col-birth">
-        <col class="col-age"><col class="col-elite"><col class="col-attend">
-      </colgroup>
-      <thead>
-        <tr>
-          <th>한글팀명</th>
-          <th>영문팀명</th>
-          <th>선수이름</th>
-          <th class="nowrap">등번호</th>
-          <th class="nowrap">포지션</th>
-          <th class="nowrap">생년월일<br><span class="muted">(YYYY-MM-DD)</span></th>
-          <th class="nowrap">만나이</th>
-          <th class="nowrap">선출</th>
-          <th class="nowrap">출석</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-
-  <div class="muted" style="margin-top:8px">
-    ※ 인쇄 시 <b>출석 체크된 선수만</b> A4 세로로 출력됩니다.
-  </div>
-</div>
-
 <script>
-/* ====== 1) 웹앱 URL 고정 ====== */
-const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
-function validWebAppUrl(u){ return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(\?.*)?$/i.test((u||'').trim()); }
-function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name)||''; }
-let WEB_APP_URL = DEFAULT_WEB_APP_URL;
-const appOverride = getParam('app'); if (validWebAppUrl(appOverride)) WEB_APP_URL = appOverride;
+/* ========== 설정 ========== */
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 
-/* ====== 공통 유틸 ====== */
-function setHealth(color, tip){ const dot=document.getElementById('healthDot'); if(!dot) return; dot.style.color=color; dot.title=tip||''; }
+/* ========== 유틸 ========== */
 const $=s=>document.querySelector(s);
-const pad=n=>String(n).padStart(2,'0');
-function apiUrl(path,q={}){ const u=new URL(WEB_APP_URL); u.searchParams.set('path', path); Object.entries(q||{}).forEach(([k,v])=>u.searchParams.set(k,v)); return u.toString(); }
-async function getJSON(u){ const r=await fetch(u,{cache:'no-store',mode:'cors'}); const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); } }
-function canon(s){ return String(s||'').toLowerCase().replace(/[\s_\-]/g,'').trim(); }
-const truthyFlag=(v)=>{ if (v===true||v===1) return true; if(typeof v==='string'){ const s=v.trim().toLowerCase(); if(['true','ok','success','done','1','yes','y','o','on','t','확인','예','유','선출'].includes(s)) return true; } return false; };
-
-/* ====== 날짜/정규화 ====== */
-function parseDateLoose(v){
-  if(!v) return null; if(v instanceof Date && !isNaN(v)) return v;
-  if(typeof v==='number'){ const d=new Date(v); return isNaN(d)?null:d; }
-  const s=String(v).trim(); const digits=s.replace(/\D/g,'');
-  if(digits.length===8){ const y=+digits.slice(0,4), m=+digits.slice(4,6)-1, d=+digits.slice(6,8); const dt=new Date(y,m,d); if(!isNaN(dt)) return dt; }
-  const d=new Date(s); return isNaN(d)?null:d;
+function apiUrl(path,q={}){ const u=new URL(WEB_APP_URL); u.searchParams.set('path', path); for(const [k,v] of Object.entries(q)) u.searchParams.set(k,v); return u.toString(); }
+function setHealth(color, tip){ const d=$('#healthDot'); if(d){ d.style.color=color; d.title=tip||''; } }
+function fetchJSON(url, timeoutMs=8000){
+  const c = new AbortController(); const id = setTimeout(()=>c.abort(), timeoutMs);
+  return fetch(url,{cache:'no-store',mode:'cors',signal:c.signal})
+    .then(r=>r.text()).then(t=>{ clearTimeout(id); return JSON.parse(t); });
 }
-function fmtYMDOnly(v){ const d=parseDateLoose(v); if(!d) return ''; return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function calcAge(dob, asOf){ const b=parseDateLoose(dob); if(!b) return ''; const ref=asOf?parseDateLoose(asOf):new Date(); if(!ref) return ''; let age=ref.getFullYear()-b.getFullYear(); const m=ref.getMonth()-b.getMonth(); if(m<0 || (m===0 && ref.getDate()<b.getDate())) age--; return String(age); }
+function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name)||''; }
+function pad(n){ return String(n).padStart(2,'0'); }
+function parseDateLoose(v){ if(!v) return null; if(v instanceof Date && !isNaN(v)) return v; if(typeof v==='number'){ const d=new Date(v); return isNaN(d)?null:d; } const s=String(v).trim(); const d8=s.replace(/\D/g,''); if(d8.length===8){ const y=+d8.slice(0,4), m=+d8.slice(4,6)-1, d=+d8.slice(6,8); const dt=new Date(y,m,d); if(!isNaN(dt)) return dt; } const d=new Date(s); return isNaN(d)?null:d; }
+function fmtYMDOnly(v){ const d=parseDateLoose(v); return d?`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`:''; }
+function calcAge(dob, asOf){ const b=parseDateLoose(dob); if(!b) return ''; const r=asOf?parseDateLoose(asOf):new Date(); let a=r.getFullYear()-b.getFullYear(); const m=r.getMonth()-b.getMonth(); if(m<0||(m===0&&r.getDate()<b.getDate())) a--; return String(a); }
 function pick(o, keys=[], fallback=''){ for(const k of keys){ if(o && o[k]!=null && String(o[k]).trim()!=='') return o[k]; } return fallback; }
+function truthy(v){ if(v===true||v===1) return true; const s=String(v??'').trim().toLowerCase(); return ['true','1','ok','yes','y','o','on','t','확인','예','유','선출'].includes(s); }
 
-/* ====== 2) 표/헤더 파서(헤더 자동 감지) ====== */
-function looksLikeHeaderRow(row){
-  const toks = row.map(v=>String(v||'').trim().toLowerCase());
-  const HINTS = new Set([
-    'playerid','teamid','team_id','팀id','id',
-    'teamnameko','teamnameen','한글팀명','영문팀명',
-    '선수이름','이름','name','nameko','nameen',
-    '등번호','number','no','jerseyno','uniformno',
-    'position','pos','포지션','포지션명',
-    'birth','birthdate','birthday','생년월일',
-    'age','만나이','나이',
-    'elite','선출','선출여부','attend','출석'
-  ]);
-  let hit=0; for(const t of toks){ if(HINTS.has(t) || /번호|포지|birth|age|나이|team|선수|출석/.test(t)) hit++; }
-  return hit>=2;
-}
-function arrayRowsToObjects(rows, headerFrom) {
-  if (!Array.isArray(rows) || !rows.length) return [];
-  let header = null, data = rows;
-  if (Array.isArray(headerFrom) && headerFrom.length){
-    header = headerFrom.map(h=>String(h).trim());
-  } else if (Array.isArray(rows[0]) && looksLikeHeaderRow(rows[0])) {
-    header = rows[0].map(h=>String(h).trim());
-    data = rows.slice(1);
-  }
-  if (!header){
-    // Players 표준 순서 가정
-    return data.map(r => ({
-      PlayerID: r[0], TeamID: r[1], teamNameKo: r[2], teamNameEn: r[3],
-      '선수이름': r[4], '등번호': r[5], '포지션': r[6], '생년월일': r[7],
-      '만나이': r[8], '선출여부': r[9], '등록일시': r[10], '출석': r[11],
-    }));
-  }
-  return data.map(r => { const o={}; header.forEach((h,i)=>o[h]=r[i]); return o; });
-}
-function rowsToObjectsFlexible(payload){
-  if (!payload) return [];
-  const rows = Array.isArray(payload.rows) ? payload.rows
-             : Array.isArray(payload.players) ? payload.players
-             : Array.isArray(payload.data) ? payload.data
-             : Array.isArray(payload) ? payload
-             : null;
-  const header = Array.isArray(payload.header) ? payload.header : null;
-  if (!rows) return [];
-  if (rows.length && Array.isArray(rows[0])) return arrayRowsToObjects(rows, header);
-  return rows;
-}
-
-/* ====== 3) 팀/선수 정규화 (한글/영문/선출 인식) ====== */
+/* ========== 정규화 ========== */
 function normalizeTeam(t){
-  if(!t) return {teamId:'', teamNameKo:'', teamNameEn:'', teamCode:''};
-  const teamId     = pick(t,['teamId','TeamID','id','Id','팀ID','tid','팀id']);
-  const teamNameKo = pick(t,['teamNameKo','teamName','nameKo','name','team_name_ko','팀명','팀명한글','한글팀명']);
-  const teamNameEn = pick(t,['teamNameEn','nameEn','team_name_en','engName','englishName','팀명영문','영문팀명']);
-  const teamCode   = pick(t,['teamCode','code','팀코드','abbr','약칭','shortname']) || teamNameEn;
-  return { teamId, teamNameKo, teamNameEn, teamCode, raw:t };
+  return {
+    teamId:     pick(t,['teamId','TeamID','id','팀ID','tid']),
+    teamNameKo: pick(t,['teamNameKo','팀명','팀명한글','한글팀명','nameKo']),
+    teamNameEn: pick(t,['teamNameEn','영문팀명','영문명','nameEn']),
+    teamCode:   pick(t,['teamCode','팀코드','abbr','약칭']) || pick(t,['teamNameEn'])
+  };
 }
-function parseBackNoToNum(raw){ const s=String(raw ?? '').trim(); if(!s) return null; if(/^\d+$/.test(s)) return parseInt(s,10); return null; }
 function normalizePlayer(p, team){
-  const name     = pick(p,['playerName','player_name','player','nameKo','name_ko','name','koreanName','korName','playerNameKo','player_name_ko','선수이름','선수','성명','Name']);
-  const backNo   = pick(p,['backNumber','backNo','jersey','jerseyNo','uniformNo','uniform','number','no','jerseyNumber','등번호','Number']);
-  const pos      = pick(p,['position','pos','포지션','포지션명','Position']);
-  const birth    = pick(p,['dob','birth','birthDate','birthday','생년월일','출생','Birth']);
-  const age      = pick(p,['age','Age','만나이']);
-  const elite    = ['elite','isElite','pro','selected','선출','선출여부','Elite'].some(k=>truthyFlag(p?.[k]));
+  const name  = pick(p,['playerName','player','선수이름','성명','이름','Name']);
+  const no    = pick(p,['backNumber','number','no','등번호','Number']);
+  const pos   = pick(p,['position','pos','포지션','포지션명','Position']);
+  const birth = pick(p,['dob','birth','birthDate','birthday','생년월일','Birth']);
+  const age   = pick(p,['age','만나이']);
+  const elite = truthy(p?.Elite) || truthy(p?.elite) || truthy(p?.selected) || truthy(p?.['선출']) || truthy(p?.['선출여부']);
+  const backNum = /^\d+$/.test(String(no||'')) ? parseInt(no,10) : null;
   return {
     teamNameKo: team.teamNameKo||'',
     teamNameEn: team.teamNameEn||'',
     playerName: String(name||''),
-    backNumber: backNo==null?'' : String(backNo).trim(),
+    backNumber: no==null?'' : String(no),
     position: pos||'',
     birthYMD: fmtYMDOnly(birth),
     age: age ? String(age) : calcAge(birth),
-    elite: elite?'O':'',
-    attend: !!truthyFlag(p?.Attend || p?.attend || p?.출석),
-    _sortBackNum: parseBackNoToNum(backNo),
-    _raw: p
+    elite: elite ? 'O':'',
+    attend: false,
+    _sortBackNum: backNum
   };
 }
 
-/* ====== 4) API 호출 ====== */
-async function health(){
-  try{
-    setHealth('#3b82f6','연결 확인 중…');
-    const j=await getJSON(apiUrl('health'));
-    if(j && (j.ok || j.status==='ok' || j.success || j.rows!==undefined)){ setHealth('#16a34a','연결 정상'); return true; }
-    setHealth('#ef4444','health 비정상'); return false;
-  }catch(e){ setHealth('#ef4444','연결 실패'); return false; }
-}
-async function fetchTeamById(teamId){
-  // 1) 단건
-  try{
-    const j=await getJSON(apiUrl('team',{teamId}));
-    const cand = j?.data || j?.team || j?.row;
-    if(cand) return normalizeTeam(cand);
-  }catch{}
-  // 2) 목록에서 찾기
-  try{
-    const j=await getJSON(apiUrl('teams'));
-    const rows=rowsToObjectsFlexible(j);
-    const found=rows.find(r=>String(pick(r,['teamId','TeamID','id'],'')).trim()===String(teamId));
-    if(found) return normalizeTeam(found);
-  }catch{}
-  return {teamId, teamNameKo:'', teamNameEn:'', teamCode:''};
-}
-
-/* ====== 5) 팀 매칭(클라 폴백) — ★ teamNameKo 확실히 포함 ★ ====== */
-function playerMatchesTeamLocally(p, team){
-  const idCands   = [ team.teamId, team.raw?.TeamID, team.raw?.teamId, team.raw?.id ].filter(Boolean).map(String);
-  const nameCands = [ team.teamNameEn, team.teamNameKo, team.teamCode ].filter(Boolean).map(String);
-  const keysId    = ['TeamID','teamId','team_id','TEAMID','팀ID','tid','id'];
-  const keysName  = [
-    'teamNameEn','team_name_en','영문팀명','영문명',
-    'teamNameKo','team_name_ko','한글팀명','팀명한글', // ← 추가
-    'Team','team','팀','팀명',
-    'nameEn','nameKo',
-    'teamCode','team_code','코드','팀코드','abbr','약칭','short','tag','key'
-  ];
-  // 1) ID 직접
-  for (const k of keysId){ const v=p[k]; if(!v) continue; for(const id of idCands){ if(String(v).trim()===String(id).trim()) return true; } }
-  // 2) 이름/코드 근사
-  for (const k of keysName){ const v=p[k]; if(!v) continue; for(const nm of nameCands){ if(canon(v)===canon(nm)) return true; } }
-  // 3) 느슨한 키
-  for (const [k,v] of Object.entries(p||{})){ const ck=k.toLowerCase().replace(/[\s_\-]/g,''); if(!v) continue;
-    if (['team','팀','팀명','영문팀명','한글팀명','teamnameen','teamnameko','teamcode','코드','팀코드','abbr','약칭','short','nameen','nameko'].includes(ck)){
-      for (const nm of nameCands){ if(canon(v)===canon(nm)) return true; }
-    }
-  }
-  return false;
-}
-
-/* ====== 6) 선수 로드 — 엔드포인트 후보 대폭 확장 ====== */
-async function fetchPlayersOfTeam(team){
-  const teamId = String(team.teamId||'').trim();
-
-  // (A) 팀ID를 쿼리로 넘겨보는 후보
-  const withTeam = ['teamplayers','team_players','players','roster','playerlist','getplayers','getPlayers','listPlayers','list_players','teamRoster','team_roster'];
-  // (B) 전체를 받아서 클라에서 필터
-  const noTeam   = ['players','roster','playerlist','getplayers','getPlayers','listPlayers','list_players','allplayers','players_all'];
-
-  // 1) 서버가 팀별 반환해주면 그걸 우선 사용
-  for(const p of withTeam){
-    try{
-      const j=await getJSON(apiUrl(p,{teamId}));
-      const rows = rowsToObjectsFlexible(j);
-      if (Array.isArray(rows) && rows.length){
-        console.log(`[TeamView] Using endpoint: ${p}?teamId=...  → ${rows.length} rows`);
-        return rows;
-      }
-    }catch(e){}
-  }
-  // 2) 폴백: 전체 받아서 팀 매칭
-  for(const p of noTeam){
-    try{
-      const j=await getJSON(apiUrl(p));
-      const all = rowsToObjectsFlexible(j);
-      if (Array.isArray(all) && all.length){
-        const filtered = all.filter(r => playerMatchesTeamLocally(r, team));
-        console.warn(`[TeamView] Local filter used. Endpoint: ${p} → all=${all.length}, matched=${filtered.length}`);
-        return filtered;
-      }
-    }catch(e){}
-  }
-  return [];
-}
-
-/* ====== 7) 렌더링 ====== */
+/* ========== 렌더링 ========== */
 function rowHtml(v, idx){
-  const checkedCls = v.attend ? 'attend-checked' : '';
   return `
-    <tr class="${checkedCls}">
-      <td>${v.teamNameKo||''}</td>
-      <td>${v.teamNameEn||''}</td>
-      <td>${v.playerName||''}</td>
-      <td class="nowrap">${v.backNumber||''}</td>
-      <td class="nowrap">${v.position||''}</td>
-      <td class="nowrap">${v.birthYMD||''}</td>
-      <td class="nowrap">${v.age||''}</td>
-      <td class="nowrap">${v.elite||''}</td>
-      <td class="nowrap">
-        <input type="checkbox" class="attend-box" data-idx="${idx}">
-        <span class="attend-mark print-only">✓</span>
-      </td>
-    </tr>`;
+  <tr>
+    <td>${v.teamNameKo||''}</td>
+    <td>${v.teamNameEn||''}</td>
+    <td>${v.playerName||''}</td>
+    <td class="nowrap">${v.backNumber||''}</td>
+    <td class="nowrap">${v.position||''}</td>
+    <td class="nowrap">${v.birthYMD||''}</td>
+    <td class="nowrap">${v.age||''}</td>
+    <td class="nowrap">${v.elite||''}</td>
+    <td class="nowrap"><input type="checkbox" class="attend-box" data-idx="${idx}"><span class="attend-mark print-only">✓</span></td>
+  </tr>`;
 }
-function renderTable(players){
-  const tbody = $('#tbody');
-  tbody.innerHTML = players.map((p,i)=>rowHtml(p,i)).join('') || `<tr><td colspan="9" class="muted">데이터 없음</td></tr>`;
-  tbody.querySelectorAll('.attend-box').forEach(cb=>{
-    cb.addEventListener('change', (e)=>{
-      const idx=+e.target.getAttribute('data-idx');
-      players[idx].attend = !!e.target.checked;
-      const tr = e.target.closest('tr');
-      tr?.classList.toggle('attend-checked', players[idx].attend);
+function bindAttend(players){
+  document.querySelectorAll('.attend-box').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      const i=+e.target.getAttribute('data-idx');
+      players[i].attend = !!e.target.checked;
+      e.target.closest('tr')?.classList.toggle('attend-checked', players[i].attend);
       $('#selectedCount').textContent = String(players.filter(p=>p.attend).length);
     });
   });
 }
 
-/* ====== 8) 부팅 ====== */
+/* ========== 메인 ========== */
 (async function boot(){
-  await health().catch(()=>{});
+  try{
+    setHealth('#3b82f6','연결 확인 중…');
+    const h = await fetchJSON(apiUrl('health'));
+    if (!h?.ok){ setHealth('#ef4444','health 비정상'); return; }
+    setHealth('#16a34a','연결 정상');
+  }catch{ setHealth('#ef4444','연결 실패'); return; }
+
   const teamId = getParam('teamId') || '';
   $('#teamIdBadge').textContent = teamId || '-';
   if(!teamId){ $('#teamNameKo').textContent='팀 ID가 없습니다'; $('#teamNameEn').textContent=''; return; }
+
+  // 팀 메타
   try{
-    const team = await fetchTeamById(teamId);
+    const t = await fetchJSON(apiUrl('team',{teamId}));
+    const team = normalizeTeam(t?.data || {});
     $('#teamNameKo').textContent = team.teamNameKo || '(팀명 미기입)';
     $('#teamNameEn').textContent = team.teamNameEn || team.teamCode || '';
 
-    const rawPlayers = await fetchPlayersOfTeam(team);
-    let players = rawPlayers.map(p=>normalizePlayer(p, team));
+    // 선수 (단일 경로만 호출 → 빠름)
+    let j = await fetchJSON(apiUrl('players',{teamId}));
+    if (!j?.ok) throw new Error(j?.error || 'players API error');
 
-    // 등번호 오름차순 정렬(숫자 우선)
+    // 서버가 0건이면, 마지막 1회 폴백: 전체 받아서 클라 필터
+    if ((j.rows||[]).length===0){
+      const all = await fetchJSON(apiUrl('players'));
+      const allRows = Array.isArray(all?.rows)?all.rows:[];
+      // teamNameKo / teamNameEn / code 근사 매칭
+      const canon = s=>String(s||'').toLowerCase().replace(/[\s_\-]/g,'');
+      const names = [team.teamNameKo, team.teamNameEn, team.teamCode].filter(Boolean).map(canon);
+      j.rows = allRows.filter(r=>{
+        const v = canon(r.teamNameKo || r['team_name_ko'] || r['한글팀명'] || r.teamNameEn || r['영문팀명'] || r['team'] || r['팀'] || r['팀명'] || r['teamCode'] || r['팀코드']);
+        return v && names.includes(v);
+      });
+    }
+
+    const players = (j.rows||[]).map(p=>normalizePlayer(p, team));
     players.sort((a,b)=>{
       const an=a._sortBackNum, bn=b._sortBackNum;
       if(an==null && bn==null) return String(a.backNumber||'').localeCompare(String(b.backNumber||''));
@@ -355,25 +121,25 @@ function renderTable(players){
     });
 
     $('#playerCount').textContent = String(players.length);
-    renderTable(players);
-    $('#selectedCount').textContent = String(players.filter(p=>p.attend).length);
+    const tbody = $('#tbody');
+    tbody.innerHTML = players.length ? players.map((p,i)=>rowHtml(p,i)).join('') : `<tr><td colspan="9" class="muted">데이터 없음</td></tr>`;
+    bindAttend(players);
 
-    const toggleAll = (checked)=>{
+    // UI 액션
+    $('#checkAll')?.addEventListener('change', e=>{
+      const checked = !!e.target.checked;
       document.querySelectorAll('.attend-box').forEach((cb,i)=>{
-        cb.checked = checked;
-        players[i].attend = checked;
+        cb.checked=checked; players[i].attend=checked;
         cb.closest('tr')?.classList.toggle('attend-checked', checked);
       });
       $('#selectedCount').textContent = String(players.filter(p=>p.attend).length);
-    };
-    document.getElementById('checkAll')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
-    document.getElementById('reloadBtn')?.addEventListener('click', ()=>location.reload());
-    document.getElementById('printBtn')?.addEventListener('click', ()=>window.print());
+    });
+    $('#reloadBtn')?.addEventListener('click', ()=>location.reload());
+    $('#printBtn')?.addEventListener('click', ()=>window.print());
+
   }catch(e){
     $('#teamNameKo').textContent='로드 실패';
     $('#teamNameEn').textContent=String(e?.message||e);
   }
 })();
 </script>
-</body>
-</html>
