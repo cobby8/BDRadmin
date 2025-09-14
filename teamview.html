@@ -35,16 +35,19 @@
 
   .table-wrap{overflow:auto;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:10px}
   table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #e6ecf5;border-radius:12px;table-layout:fixed}
-
-  /* === 모두 가운데 정렬 === */
-  thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:center;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
-  tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff;text-align:center}
+  thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:left;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
+  tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff}
   tbody tr:last-child td{border-bottom:none}
 
-  /* === 열 폭(요청 반영) === */
-  col.col-teamko{width:12.6%}  /* 한글팀명 (기존 teamNameKo 70%) */
-  col.col-teamen{width:12.6%}  /* 영문팀명 (기존 teamNameEn 70%) */
-  col.col-pname{width:10.8%}   /* 선수이름 (기존 60%) */
+  /* === 열 폭 재배치 (요청 반영) ===
+     - teamNameKo: 18% → 12.6% (70%)
+     - teamNameEn: 18% → 12.6% (70%)
+     - 선수이름:   18% → 10.8% (60%)
+     - 나머지 열로 18%p 재분배
+   */
+  col.col-teamko{width:12.6%}
+  col.col-teamen{width:12.6%}
+  col.col-pname{width:10.8%}
   col.col-no{width:10%}
   col.col-pos{width:9%}
   col.col-birth{width:20%}
@@ -53,16 +56,18 @@
   col.col-attend{width:8%}
 
   td,th{word-break:keep-all; overflow-wrap:anywhere; line-height:1.35}
+  .t-center{text-align:center}
+  .t-right{text-align:right}
   .nowrap{white-space:nowrap}
 
-  /* 출석 체크 상태 강조(화면) */
+  /* 출석 체크 상태에 따라 행 강조(화면에서만) */
   tbody tr.attend-checked{background:linear-gradient(0deg, rgba(22,163,74,.06), rgba(22,163,74,.06))}
   tbody tr.attend-checked td{border-bottom-color:#d1fae5}
 
   .print-only{display:none}
   .screen-only{display:initial}
 
-  /* ===== 인쇄 최적화: A4 세로 + 체크된 행만 출력 ===== */
+  /* ===== 인쇄 최적화: A4 세로 + 체크된 행만 출력 + 줄바꿈 최소화 ===== */
   @page{ size:A4 portrait; margin:12mm }
   @media print{
     body{background:#fff}
@@ -70,12 +75,16 @@
     header, .screen-only{display:none !important}
     .table-wrap{box-shadow:none;border:0;padding:0}
     table{border:0;border-spacing:0}
-    thead th, tbody td{border:1px solid #ddd; text-align:center !important}
+    thead th, tbody td{border:1px solid #ddd}
     thead th{background:#f3f4f6 !important;-webkit-print-color-adjust:exact; print-color-adjust:exact}
-    tbody tr:not(.attend-checked){display:none} /* 체크 안된 행 숨김 */
+    /* 출석 체크되지 않은 행은 인쇄에서 제외 */
+    tbody tr:not(.attend-checked){display:none}
+    /* 체크박스 대신 ✓ 출력 */
     .attend-box{display:none !important}
     .attend-mark{display:inline !important}
+    /* 행 단위 분리 방지 */
     tr{break-inside:avoid; page-break-inside:avoid}
+    /* 짧은 필드 줄바꿈 최소화 */
     td.nowrap, th.nowrap{white-space:nowrap !important}
   }
 </style>
@@ -121,15 +130,15 @@
       </colgroup>
       <thead>
         <tr>
-          <th>한글팀명</th>
-          <th>영문팀명</th>
+          <th>teamNameKo</th>
+          <th>teamNameEn</th>
           <th>선수이름</th>
           <th class="nowrap">등번호</th>
           <th class="nowrap">포지션</th>
           <th class="nowrap">생년월일<br><span class="muted">(YYYY-MM-DD)</span></th>
           <th class="nowrap">만나이</th>
-          <th class="nowrap">선출</th>
-          <th class="nowrap">출석</th>
+          <th class="nowrap">선출여부</th>
+          <th class="nowrap t-center">출석</th>
         </tr>
       </thead>
       <tbody id="tbody">
@@ -236,12 +245,12 @@ function normalizePlayer(p, team){
     age: calcAge(birth),
     elite: elite?'O':'',
     attend: false,
-    _sortBackNum: parseBackNoToNum(backNoRaw),
+    _sortBackNum: parseBackNoToNum(backNoRaw), // 정렬용 숫자
     _raw: p
   };
 }
 
-/* ====== 응답 안에서 선수배열 찾기(중첩 탐색) ====== */
+/* ========= (추가) 선수배열 탐색/폴백 유틸 ========= */
 function looksLikePlayer(o){
   if(!o || typeof o!=='object') return false;
   const keys = Object.keys(o);
@@ -251,9 +260,9 @@ function looksLikePlayer(o){
 }
 function firstArrayDeep(obj, keyHints=['rows','players','data','roster','members','athletes','items','list','result']){
   const visited=new Set();
-  const stack=[obj];
-  while(stack.length){
-    const cur=stack.shift();
+  const q=[obj];
+  while(q.length){
+    const cur=q.shift();
     if(!cur || typeof cur!=='object') continue;
     if(visited.has(cur)) continue; visited.add(cur);
     for(const k of Object.keys(cur)){
@@ -261,14 +270,12 @@ function firstArrayDeep(obj, keyHints=['rows','players','data','roster','members
       if(Array.isArray(v) && v.length && typeof v[0]==='object'){
         if(keyHints.includes(k) || looksLikePlayer(v[0])) return v;
       }else if(v && typeof v==='object'){
-        stack.push(v);
+        q.push(v);
       }
     }
   }
   return null;
 }
-
-/* ====== API 호출 유틸(경로/파라미터 폴백) ====== */
 async function tryFetchArray(paths=[], paramVariants=[{}]){
   for(const p of paths){
     for(const q of paramVariants){
@@ -280,56 +287,11 @@ async function tryFetchArray(paths=[], paramVariants=[{}]){
         else if(Array.isArray(j?.data)) arr=j.data;
         if(!arr) arr = firstArrayDeep(j);
         if(Array.isArray(arr)) return arr;
-      }catch(e){ /* skip */ }
+      }catch(e){ /* ignore */ }
     }
   }
   return null;
 }
-
-/* ====== 선수 불러오기 (강화판) ====== */
-async function fetchPlayersOfTeamStrong(team){
-  const teamId = team.teamId;
-  const tourId = team.tourId || '';
-  const pathsMain = ['players','teamplayers','team_players','teamroster','team_roster','roster','memberlist','members','athletes','playerlist','getplayers','list_players'];
-  const paramVariants = [
-    {teamId}, {TeamID:teamId}, {team_id:teamId}, {id:teamId},
-    tourId?{teamId, tourId}:null,
-    tourId?{team_id:teamId, tourId}:null,
-    tourId?{teamId, tournamentId:tourId}:null
-  ].filter(Boolean);
-
-  // 1) 주 경로 + 다양한 파라미터
-  let arr = await tryFetchArray(pathsMain, paramVariants);
-  if(arr) return filterByTeam(arr, team);
-
-  // 2) 팀 상세 안에 roster/players가 있는 경우
-  const teamDetailPaths=['team','getteam','teamdetail','team_detail','teaminfo','team_info','Team'];
-  const teamDetailParamVariants = [{teamId},{TeamID:teamId},{team_id:teamId},{id:teamId}];
-  const detail = await (async ()=>{
-    for(const p of teamDetailPaths){
-      for(const q of teamDetailParamVariants){
-        try{
-          const j=await getJSON(apiUrl(p,q));
-          if(j && typeof j==='object') return j;
-        }catch{}
-      }
-    }
-    return null;
-  })();
-  if(detail){
-    const nested = firstArrayDeep(detail);
-    if(Array.isArray(nested)) return filterByTeam(nested, team);
-  }
-
-  // 3) 선수 전체를 받아 필터링
-  const allParamVariants = tourId ? [{tourId},{tournamentId:tourId},{TourID:tourId},{}] : [{}];
-  const allPlayers = await tryFetchArray(pathsMain, allParamVariants);
-  if(allPlayers) return filterByTeam(allPlayers, team);
-
-  // 4) 마지막: 아무것도 못 찾으면 빈 배열
-  return [];
-}
-
 function filterByTeam(rows, team){
   const id=String(team.teamId||'').trim();
   const ko=(team.teamNameKo||'').trim();
@@ -347,24 +309,106 @@ function filterByTeam(rows, team){
     const enVal = enKeys.map(k=>r[k]).find(v=>v!=null && String(v).trim()!=='');
     return {ko:(koVal||'').trim(), en:(enVal||'').trim()};
   };
+  const norm = s=>String(s||'').toLowerCase().replace(/\s+/g,'').trim();
 
-  // 우선 teamId 일치
+  // teamId 우선
   let out = rows.filter(r=> getTeamIdFromRow(r) === id );
   if(out.length>0) return out;
 
-  // 팀명으로 대체 매칭(대소문자/공백 무시)
-  const norm = s=>String(s||'').toLowerCase().replace(/\s+/g,'').trim();
+  // 팀명으로 대체 매칭
   out = rows.filter(r=>{
     const n = getTeamNameFromRow(r);
     return (ko && norm(n.ko)===norm(ko)) || (en && norm(n.en)===norm(en));
   });
   if(out.length>0) return out;
 
-  // 그래도 없으면 원본 반환(서버가 이미 팀별로 내려준 경우)
+  // 그대로 반환(서버가 이미 팀별로 내려준 경우)
   return rows;
 }
 
-/* ====== 테이블 렌더링/정렬 ====== */
+/* ========= 기존 API 유틸 ========= */
+async function health(){
+  try{
+    setHealth('#3b82f6','연결 확인 중…');
+    const j=await getJSON(apiUrl('health'));
+    if(j && (j.ok || j.status==='ok' || j.success || j.rows!==undefined)){ setHealth('#22c55e','연결 정상'); return true; }
+    setHealth('#ef4444','health 비정상'); return false;
+  }catch(e){ setHealth('#ef4444','연결 실패'); return false; }
+}
+
+async function fetchTeamById(teamId){
+  const tryPaths = ['team','getteam','Team'];
+  for(const p of tryPaths){
+    try{
+      const j=await getJSON(apiUrl(p,{teamId}));
+      const cand = j?.data || j?.team || j?.row;
+      if(cand) return normalizeTeam(cand);
+    }catch{}
+  }
+  try{
+    const j=await getJSON(apiUrl('teams'));
+    const rows=Array.isArray(j?.rows)?j.rows:[];
+    const found=rows.find(r=>String(r.teamId||r.TeamID||r.id||'')===String(teamId));
+    if(found) return normalizeTeam(found);
+  }catch{}
+  return {teamId, teamNameKo:'', teamNameEn:''};
+}
+
+/* ========= (대체) 강화된 선수 로더 ========= */
+async function fetchPlayersOfTeamStrong(team){
+  const teamId = team.teamId;
+  const tourId = team.tourId || '';
+
+  // 1) 메인 경로 + 다양한 파라미터 시도
+  const pathsMain = ['players','teamplayers','team_players','teamroster','team_roster','roster','memberlist','members','athletes','playerlist','getplayers','list_players'];
+  const paramVariants = [
+    {teamId}, {TeamID:teamId}, {team_id:teamId}, {id:teamId},
+    tourId?{teamId, tourId}:null,
+    tourId?{team_id:teamId, tourId}:null,
+    tourId?{teamId, tournamentId:tourId}:null
+  ].filter(Boolean);
+
+  let arr = await tryFetchArray(pathsMain, paramVariants);
+  if(Array.isArray(arr)) return filterByTeam(arr, team);
+
+  // 2) 팀 상세 안에 중첩된 players/roster 탐색
+  const teamDetailPaths=['team','getteam','teamdetail','team_detail','teaminfo','team_info','Team'];
+  const teamDetailParamVariants = [{teamId},{TeamID:teamId},{team_id:teamId},{id:teamId}];
+  for(const p of teamDetailPaths){
+    for(const q of teamDetailParamVariants){
+      try{
+        const j=await getJSON(apiUrl(p,q));
+        const nested = firstArrayDeep(j);
+        if(Array.isArray(nested)) return filterByTeam(nested, team);
+      }catch{}
+    }
+  }
+
+  // 3) 전체 목록을 받아 필터링(최후 폴백)
+  const allParamVariants = tourId ? [{tourId},{tournamentId:tourId},{TourID:tourId},{}] : [{}];
+  arr = await tryFetchArray(pathsMain, allParamVariants);
+  if(Array.isArray(arr)) return filterByTeam(arr, team);
+
+  // 4) 그래도 없으면 빈 배열
+  return [];
+}
+
+/* ========= (원본) 단순 선수 로더 — 보존 (미사용) ========= */
+async function fetchPlayersOfTeam(teamId){
+  const paths=['players','teamplayers','team_players','roster','playerlist','getplayers'];
+  for(const p of paths){
+    try{
+      const j=await getJSON(apiUrl(p,{teamId}));
+      const rows = Array.isArray(j?.rows) ? j.rows
+                 : Array.isArray(j?.players) ? j.players
+                 : Array.isArray(j?.data) ? j.data : null;
+      if(rows) return rows;
+    }catch{}
+  }
+  return [];
+}
+
+/* 렌더링 */
 function rowHtml(v, idx){
   const checkedCls = v.attend ? 'attend-checked' : '';
   return `
@@ -372,12 +416,12 @@ function rowHtml(v, idx){
       <td>${v.teamNameKo||''}</td>
       <td>${v.teamNameEn||''}</td>
       <td>${v.playerName||''}</td>
-      <td class="nowrap">${v.backNumber||''}</td>
-      <td class="nowrap">${v.position||''}</td>
-      <td class="nowrap">${v.birthYMD||''}</td>
-      <td class="nowrap">${v.age||''}</td>
-      <td class="nowrap">${v.elite||''}</td>
-      <td class="nowrap">
+      <td class="t-center nowrap">${v.backNumber||''}</td>
+      <td class="t-center nowrap">${v.position||''}</td>
+      <td class="t-center nowrap">${v.birthYMD||''}</td>
+      <td class="t-center nowrap">${v.age||''}</td>
+      <td class="t-center nowrap">${v.elite||''}</td>
+      <td class="t-center nowrap">
         <input type="checkbox" class="attend-box" data-idx="${idx}">
         <span class="attend-mark print-only">✓</span>
       </td>
@@ -386,8 +430,7 @@ function rowHtml(v, idx){
 
 function renderTable(players){
   const tbody = $('#tbody');
-  tbody.innerHTML = players.length ? players.map((p,i)=>rowHtml(p,i)).join('')
-                                   : `<tr><td colspan="9" class="muted">데이터 없음</td></tr>`;
+  tbody.innerHTML = players.map((p,i)=>rowHtml(p,i)).join('') || `<tr><td colspan="9" class="muted">데이터 없음</td></tr>`;
   // 바인딩
   tbody.querySelectorAll('.attend-box').forEach(cb=>{
     cb.addEventListener('change', (e)=>{
@@ -405,16 +448,9 @@ function updateSelectedCount(players){
   $('#selectedCount').textContent = String(n);
 }
 
-/* ====== 부팅 ====== */
+/* 메인 로드 */
 (async function boot(){
-  try{
-    setHealth('#3b82f6','연결 확인 중…');
-    await getJSON(apiUrl('health')).then(j=>{
-      if(j && (j.ok || j.status==='ok' || j.success || j.rows!==undefined)) setHealth('#22c55e','연결 정상');
-      else setHealth('#ef4444','health 비정상');
-    }).catch(()=> setHealth('#ef4444','연결 실패'));
-  }catch{}
-
+  await health().catch(()=>{});
   const teamId = getParam('teamId') || '';
   $('#teamIdBadge').textContent = teamId || '-';
   if(!teamId){
@@ -424,53 +460,32 @@ function updateSelectedCount(players){
   }
 
   try{
-    // 팀 정보
-    const team = await (async()=>{
-      // 여러 경로에서 팀 조회
-      const candidates=[['team',{teamId}],['getteam',{teamId}],['Team',{teamId}]];
-      for(const [p,q] of candidates){
-        try{
-          const j=await getJSON(apiUrl(p,q));
-          const cand = j?.data || j?.team || j?.row || j;
-          if(cand && typeof cand==='object'){
-            const t = normalizeTeam(cand);
-            if(t.teamId) return t;
-          }
-        }catch{}
-      }
-      // 목록에서 찾기
-      try{
-        const j=await getJSON(apiUrl('teams'));
-        const rows=Array.isArray(j?.rows)?j.rows:[];
-        const found=rows.find(r=>String(r.teamId||r.TeamID||r.id||'')===String(teamId));
-        if(found) return normalizeTeam(found);
-      }catch{}
-      return {teamId, teamNameKo:'', teamNameEn:''};
-    })();
-
+    const team = await fetchTeamById(teamId);
     $('#teamNameKo').textContent = team.teamNameKo || '(팀명 미기입)';
     $('#teamNameEn').textContent = team.teamNameEn || '';
 
-    // 선수 목록 (강화판)
+    // ▼ 변경: 강화된 선수 로더 사용
     let rawPlayers = await fetchPlayersOfTeamStrong(team);
     let players = rawPlayers.map(p=>normalizePlayer(p, team));
 
-    // 등번호 오름차순 정렬
+    // ▶ 등번호 오름차순 정렬 (원본 유지)
     players.sort((a,b)=>{
-      const an=a._sortBackNum, bn=b._sortBackNum;
+      const an = a._sortBackNum, bn = b._sortBackNum;
       if(an==null && bn==null){
+        // 둘 다 숫자 아님 → 문자열 오름차순
         return String(a.backNumber||'').localeCompare(String(b.backNumber||''));
       }
-      if(an==null) return 1;
+      if(an==null) return 1;   // 숫자 아님은 뒤로
       if(bn==null) return -1;
-      return an - bn;
+      return an - bn;          // 오름차순
     });
 
     $('#playerCount').textContent = String(players.length);
+
     renderTable(players);
     updateSelectedCount(players);
 
-    // 상단 전체선택
+    // 상단 "출석 전체선택"만 유지
     const toggleAll = (checked)=>{
       const cbs = document.querySelectorAll('.attend-box');
       cbs.forEach((cb, i)=>{
@@ -483,14 +498,13 @@ function updateSelectedCount(players){
     };
     $('#checkAll')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
 
-    // 새로고침 & 인쇄
+    // 새로고침 & 프린트/저장 (우측 배치 유지)
     $('#reloadBtn')?.addEventListener('click', ()=>location.reload());
     $('#printBtn')?.addEventListener('click', ()=>window.print());
 
   }catch(e){
-    console.error('TeamView load error:', e);
-    $('#playerCount').textContent = '0';
-    $('#tbody').innerHTML = `<tr><td colspan="9" class="muted">선수 데이터를 불러오지 못했습니다.</td></tr>`;
+    $('#teamNameKo').textContent='로드 실패';
+    $('#teamNameEn').textContent=String(e?.message||e);
   }
 })();
 </script>
