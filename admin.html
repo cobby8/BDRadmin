@@ -40,7 +40,7 @@
   .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:16px}
   .offscreen{position:absolute;left:-9999px;opacity:0;width:0;height:0;pointer-events:none}
 
-  /* ===== 목록 테이블 ===== */
+  /* 목록 테이블 */
   table{width:100%;border-collapse:separate;border-spacing:0 10px;table-layout:fixed}
   col.col-tournament{width:17%}
   col.col-region{width:15%}
@@ -149,8 +149,8 @@
         <div class="poster-preview" id="posterPreview"></div>
         <div class="toolbar" style="justify-content:space-between;margin-top:6px">
           <div class="poster-meta">
-            <label><input type="checkbox" id="posterEmbed"> DataURL로 저장(권장 X)</label>
-            <span class="muted">※ 미체크 시 서버가 Drive에 업로드하고 링크/ID만 저장합니다.</span>
+            <label><input type="checkbox" id="posterEmbed" disabled> DataURL로 저장(사용 안 함)</label>
+            <span class="muted">※ 서버는 Drive에 업로드하고 <b>posterId/posterUrl</b>만 저장합니다.</span>
           </div>
           <div class="toolbar">
             <button class="btn" id="posterCopy" disabled>주소 복사</button>
@@ -265,30 +265,20 @@ async function getJSON(u){
   const r=await fetch(u,{cache:'no-store',mode:'cors',credentials:'omit',redirect:'follow'});
   const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); }
 }
-/* POST 전송기 — preflight 없는 text/plain → 실패 시 urlencoded(payload=) 폴백 */
 async function postJSONCompat(paths, payload){
   const bodyText = JSON.stringify(payload||{});
   const tryTextPlain = async(p)=>{
     const r = await fetch(apiUrl(p), {
-      method:'POST',
-      headers:{'Content-Type':'text/plain'},
-      body: bodyText,
-      cache:'no-store',
-      redirect:'follow',
-      credentials:'omit',
-      mode:'cors'
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: bodyText, cache:'no-store', redirect:'follow', credentials:'omit', mode:'cors'
     });
     const t=await r.text(); try{ return JSON.parse(t); }catch{ return {ok:false,error:t||'JSON 파싱 실패'}; }
   };
   const tryUrlEncoded = async(p)=>{
     const r = await fetch(apiUrl(p), {
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body: 'payload='+encodeURIComponent(bodyText),
-      cache:'no-store',
-      redirect:'follow',
-      credentials:'omit',
-      mode:'cors'
+      cache:'no-store', redirect:'follow', credentials:'omit', mode:'cors'
     });
     const t=await r.text(); try{ return JSON.parse(t); }catch{ return {ok:false,error:t||'JSON 파싱 실패'}; }
   };
@@ -430,6 +420,7 @@ function setLocked(locked){
   if (locked) area.classList.add('locked'); else area.classList.remove('locked');
 
   document.querySelectorAll('[data-editable]').forEach(e => e.disabled = locked);
+
   const admin = $('#adminCode');
   if (locked) { admin.setAttribute('readonly', ''); }
   else { admin.addEventListener('focus', () => admin.removeAttribute('readonly'), { once: true }); }
@@ -440,7 +431,7 @@ function setLocked(locked){
   $('#addPlaceBtn').disabled   = locked;
   $('#clearAllDivBtn').disabled = locked || DIV_STATE.length === 0;
 
-  // 편집중이면 수정버튼 비활성화, 읽기모드에서는(locked) 선택된 대회가 있을 때만 활성화
+  // 편집중이면 수정 버튼 비활성, 읽기 전용(locked) 상태에만 활성
   const editBtn = $('#editBtn');
   if (editBtn) {
     editBtn.disabled = locked ? !CURRENT_TOUR_ID : true;
@@ -465,20 +456,71 @@ async function confirmDiscardIfDirty(){ if(!DIRTY) return true; const ok=confirm
 
 /* ========= 종별/장소 UI ========= */
 const DIVISION_PRESETS={'일반부':['D3','D4','D5','D6','D7'],'대학부':['U1','U2','U3','UW'],'여성부':['D3','D4','D5'],'유소년부':['하모니','i1','i2','i3','i4']};
-function renderDivRow(container, group, values, editable){ const row=el(`<div class="place-item"></div>`); const left=el(`<div style="display:flex;align-items:center;gap:8px"><b>${group}</b></div>`); const delSmall=el(`<button class="btn danger" style="padding:4px 8px;font-size:12px" ${editable?'':'disabled'}>삭제</button>`); delSmall.addEventListener('click',()=>{ if(FORM_LOCKED) return; if(confirm(\`"\${group}" 구분을 삭제할까요?\`)){ DIV_STATE=DIV_STATE.filter(s=>s.group!==group); DIRTY=true; refreshDivUI(); } }); left.appendChild(delSmall); row.appendChild(left); const chips=el(`<div class="chips"></div>`); chips.innerHTML = (values||[]).length ? values.map(v=>`<span class="chip" data-v="${v}" title="${editable?'클릭하여 제거':''}">${v}${editable?' ×':''}</span>`).join('') : `<span class="muted">미선택</span>`; if (editable){ chips.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{ const v=c.getAttribute('data-v'); const set=DIV_STATE.find(s=>s.group===group); if(set){ set.divisions=set.divisions.filter(x=>x!==v); DIRTY=true; refreshDivUI(); }})); } row.appendChild(chips); row.appendChild(el(`<div></div>`)); row.appendChild(el(`<div></div>`)); container.appendChild(row); }
+function renderDivRow(container, group, values, editable){
+  const row=el(`<div class="place-item"></div>`);
+  const left=el(`<div style="display:flex;align-items:center;gap:8px"><b>${group}</b></div>`);
+  const delSmall=el(`<button class="btn danger" style="padding:4px 8px;font-size:12px" ${editable?'':'disabled'}>삭제</button>`);
+  delSmall.addEventListener('click',()=>{ if(FORM_LOCKED) return; if(confirm(`"${group}" 구분을 삭제할까요?`)){ DIV_STATE=DIV_STATE.filter(s=>s.group!==group); DIRTY=true; refreshDivUI(); } });
+  left.appendChild(delSmall);
+  row.appendChild(left);
+  const chips=el(`<div class="chips"></div>`);
+  chips.innerHTML = (values||[]).length ? values.map(v=>`<span class="chip" data-v="${v}" title="${editable?'클릭하여 제거':''}">${v}${editable?' ×':''}</span>`).join('') : `<span class="muted">미선택</span>`;
+  if (editable){
+    chips.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{ const v=c.getAttribute('data-v'); const set=DIV_STATE.find(s=>s.group===group); if(set){ set.divisions=set.divisions.filter(x=>x!==v); DIRTY=true; refreshDivUI(); }}));
+  }
+  row.appendChild(chips);
+  row.appendChild(el(`<div></div>`));
+  row.appendChild(el(`<div></div>`));
+  container.appendChild(row);
+}
 function refreshDivUI(){ const box=$('#divSetList'); box.innerHTML=''; const editable=!FORM_LOCKED; DIV_STATE.forEach(s=> renderDivRow(box,s.group,s.divisions||[],editable)); $('#addDivSetBtn').disabled=FORM_LOCKED; $('#clearAllDivBtn').disabled=FORM_LOCKED || DIV_STATE.length===0; }
-function openDivFloating(){ const body=el(`<div><label>구분</label><select id="popGroupSel" style="width:100%;margin-bottom:8px;padding:10px;border:1px solid #e6ecf5;border-radius:12px"></select><div id="popDivChecks"></div></div>`); const sel = body.querySelector('#popGroupSel'); sel.innerHTML=Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join(''); const checks=body.querySelector('#popDivChecks'); function render(g){ const opts=DIVISION_PRESETS[g]||[]; checks.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px;">${opts.map(v=>`<label class="chip"><input type="checkbox" value="${v}"> ${v}</label>`).join('')}</div>`; } sel.addEventListener('change',()=>render(sel.value)); render(sel.value); const actions=el(`<div></div>`); const cancel=el(`<button class="btn">취소</button>`); const ok=el(`<button class="btn primary">적용</button>`); actions.appendChild(cancel); actions.appendChild(ok); cancel.addEventListener('click', closePopover); ok.addEventListener('click',()=>{ const picked=[...checks.querySelectorAll('input:checked')].map(i=>i.value); if(!picked.length) return alert('종별을 선택하세요.'); let set=DIV_STATE.find(s=>s.group===sel.value); if(!set){ set={group:sel.value,divisions:[]}; DIV_STATE.push(set); } picked.forEach(v=>{ if(!set.divisions.includes(v)) set.divisions.push(v); }); DIRTY=true; refreshDivUI(); closePopover(); }); openPopoverCentered('구분/종별 선택', body, actions); }
+function openDivFloating(){
+  const body=el(`<div><label>구분</label><select id="popGroupSel" style="width:100%;margin-bottom:8px;padding:10px;border:1px solid #e6ecf5;border-radius:12px"></select><div id="popDivChecks"></div></div>`);
+  const sel = body.querySelector('#popGroupSel');
+  sel.innerHTML=Object.keys(DIVISION_PRESETS).map(g=>`<option value="${g}">${g}</option>`).join('');
+  const checks=body.querySelector('#popDivChecks');
+  function render(g){ const opts=DIVISION_PRESETS[g]||[]; checks.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px;">${opts.map(v=>`<label class="chip"><input type="checkbox" value="${v}"> ${v}</label>`).join('')}</div>`; }
+  sel.addEventListener('change',()=>render(sel.value));
+  render(sel.value);
+  const actions=el(`<div></div>`);
+  const cancel=el(`<button class="btn">취소</button>`);
+  const ok=el(`<button class="btn primary">적용</button>`);
+  actions.appendChild(cancel); actions.appendChild(ok);
+  cancel.addEventListener('click', closePopover);
+  ok.addEventListener('click',()=>{ const picked=[...checks.querySelectorAll('input:checked')].map(i=>i.value); if(!picked.length) return alert('종별을 선택하세요.'); let set=DIV_STATE.find(s=>s.group===sel.value); if(!set){ set={group:sel.value,divisions:[]}; DIV_STATE.push(set); } picked.forEach(v=>{ if(!set.divisions.includes(v)) set.divisions.push(v); }); DIRTY=true; refreshDivUI(); closePopover(); });
+  openPopoverCentered('구분/종별 선택', body, actions);
+}
 document.getElementById('addDivSetBtn').addEventListener('click', openDivFloating);
 
-function makePlaceRow(init={name:''}){ const row=el(`<div class="place-item"></div>`); const name=el(`<div><label style="margin:0 0 6px">장소명</label><input value="${init.name||''}" data-editable placeholder="예: 서울특별시학생체육관"></div>`); const f1=el(`<div></div>`), f2=el(`<div></div>`); const ctrl=el(`<div style="display:flex;gap:6px;align-items:flex-end"><button class="btn" data-edit data-editable>이름 수정</button><button class="btn danger" data-del data-editable>삭제</button></div>`); ctrl.querySelector('[data-edit]').addEventListener('click',()=> openPlaceFloating(name.querySelector('input').value,(newName)=>{ name.querySelector('input').value=newName; DIRTY=true; })); ctrl.querySelector('[data-del]').addEventListener('click',()=>{ row.remove(); DIRTY=true; }); row.appendChild(name); row.appendChild(f1); row.appendChild(f2); row.appendChild(ctrl); row.getValue=()=>({name:name.querySelector('input').value.trim()}); return row; }
+function makePlaceRow(init={name:''}){
+  const row=el(`<div class="place-item"></div>`);
+  const name=el(`<div><label style="margin:0 0 6px">장소명</label><input value="${init.name||''}" data-editable placeholder="예: 서울특별시학생체육관"></div>`);
+  const f1=el(`<div></div>`), f2=el(`<div></div>`);
+  const ctrl=el(`<div style="display:flex;gap:6px;align-items:flex-end"><button class="btn" data-edit data-editable>이름 수정</button><button class="btn danger" data-del data-editable>삭제</button></div>`);
+  ctrl.querySelector('[data-edit]').addEventListener('click',()=> openPlaceFloating(name.querySelector('input').value,(newName)=>{ name.querySelector('input').value=newName; DIRTY=true; }));
+  ctrl.querySelector('[data-del]').addEventListener('click',()=>{ row.remove(); DIRTY=true; });
+  row.appendChild(name); row.appendChild(f1); row.appendChild(f2); row.appendChild(ctrl);
+  row.getValue=()=>({name:name.querySelector('input').value.trim()});
+  return row;
+}
 function getPlaces(){ return [...document.querySelectorAll('#placeList .place-item')].map(it=>it.getValue()).filter(p=>p.name); }
 function setPlaces(list){ const box=$('#placeList'); box.innerHTML=''; (list&&list.length?list:[]).forEach(v=>{ const nm=(typeof v==='string')?v:(v?.name||v?.address||''); box.appendChild(makePlaceRow({name:nm})); }); }
-function openPlaceFloating(initName,onApply){ if (FORM_LOCKED){ if (!CURRENT_TOUR_ID) setLocked(false); else { alert('상단 "수정" 버튼을 눌러 편집을 해제하세요.'); return; } } const body=el(`<div><label>장소명</label><input id="popPlaceName" placeholder="예: 서울특별시학생체육관" style="width:100%;border:1px solid #e6ecf5;border-radius:12px;padding:12px"/></div>`); body.querySelector('#popPlaceName').value=initName||''; const actions=el(`<div></div>`); const cancel=el(`<button class="btn">취소</button>`); const ok=el(`<button class="btn primary">적용</button>`); actions.appendChild(cancel); actions.appendChild(ok); cancel.addEventListener('click', closePopover); ok.addEventListener('click',()=>{ const name=body.querySelector('#popPlaceName').value.trim(); if(!name) return alert('장소명을 입력하세요.'); onApply(name); DIRTY=true; closePopover(); }); openPopoverCentered(initName?'장소명 수정':'장소 추가', body, actions); }
+function openPlaceFloating(initName,onApply){
+  if (FORM_LOCKED){ if (!CURRENT_TOUR_ID) setLocked(false); else { alert('상단 "수정" 버튼을 눌러 편집을 해제하세요.'); return; } }
+  const body=el(`<div><label>장소명</label><input id="popPlaceName" placeholder="예: 서울특별시학생체육관" style="width:100%;border:1px solid #e6ecf5;border-radius:12px;padding:12px"/></div>`);
+  body.querySelector('#popPlaceName').value=initName||'';
+  const actions=el(`<div></div>`);
+  const cancel=el(`<button class="btn">취소</button>`);
+  const ok=el(`<button class="btn primary">적용</button>`);
+  actions.appendChild(cancel); actions.appendChild(ok);
+  cancel.addEventListener('click', closePopover);
+  ok.addEventListener('click',()=>{ const name=body.querySelector('#popPlaceName').value.trim(); if(!name) return alert('장소명을 입력하세요.'); onApply(name); DIRTY=true; closePopover(); });
+  openPopoverCentered(initName?'장소명 수정':'장소 추가', body, actions);
+}
 
 /* ========= 포스터: 업로드/미리보기 ========= */
 let POSTER_DATA_URL='', POSTER_CLEAR=false;
 
-// 정규화: posterId / posterUrl에서 최종 표시 URL 산출
 function extractDriveId(u){
   const s=String(u||'').trim();
   if(!s) return '';
@@ -489,17 +531,16 @@ function extractDriveId(u){
   return '';
 }
 function buildDriveViewUrl(id){ return 'https://drive.google.com/uc?export=view&id='+encodeURIComponent(id); }
-function normalizePosterFromTour(t){
-  if(!t) return '';
-  const id = extractDriveId(t.posterId) || extractDriveId(t.posterUrl);
-  if(id) return buildDriveViewUrl(id);
-  const u = String(t.posterUrl||'');
-  if(/\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(u)) return u;
+function normalizePosterFromFields(posterUrl, posterId){
+  const id = extractDriveId(posterId) || extractDriveId(posterUrl);
+  if (id) return buildDriveViewUrl(id);
+  const u = String(posterUrl||'');
+  if (/\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(u)) return u;
   try{
-    const host=new URL(u).hostname;
-    if(/(^|\.)drive\.google\.com$/.test(host)) return u;
-    if(/(^|\.)googleusercontent\.com$/.test(host)) return u;
-    if(/(^|\.)ggpht\.com$/.test(host)) return u;
+    const host = new URL(u).hostname;
+    if (/(^|\.)drive\.google\.com$/.test(host)) return u;
+    if (/(^|\.)googleusercontent\.com$/.test(host)) return u;
+    if (/(^|\.)ggpht\.com$/.test(host)) return u;
   }catch(e){}
   return '';
 }
@@ -509,8 +550,9 @@ async function renderPoster(){
   let showUrl = '';
   if(POSTER_DATA_URL && !POSTER_CLEAR){
     showUrl = POSTER_DATA_URL;
-  }else if(!POSTER_CLEAR && CURRENT_TOUR_OBJ){
-    showUrl = normalizePosterFromTour(CURRENT_TOUR_OBJ);
+  }else if(!POSTER_CLEAR){
+    const t = CURRENT_TOUR_OBJ;
+    if (t) showUrl = normalizePosterFromFields(t.posterUrl, t.posterId);
   }
 
   if(!showUrl){
@@ -522,7 +564,7 @@ async function renderPoster(){
     $('#posterCopy').disabled=true; $('#posterClear').disabled=true;
     wirePosterInteractions();
   }else{
-    prev.innerHTML = `<img src="${showUrl}" alt="poster" referrerpolicy="no-referrer"> <div class="muted">${POSTER_DATA_URL?'업로드(미저장)':'현재 저장된 포스터'}</div>`;
+    prev.innerHTML = `<img src="${showUrl}" alt="poster"> <div class="muted">${POSTER_DATA_URL?'업로드(미저장)':'현재 저장된 포스터'}</div>`;
     $('#posterCopy').disabled=false; $('#posterClear').disabled=false;
   }
 }
@@ -548,10 +590,10 @@ async function fileToJpegDataUrl(file, maxW=1024, q=0.8){
   const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; canvas.getContext('2d').drawImage(img,0,0,w,h);
   return canvas.toDataURL('image/jpeg', q);
 }
-document.getElementById('posterCopy').addEventListener('click', async ()=>{ 
-  let url = '';
-  if(POSTER_DATA_URL && !POSTER_CLEAR) url = POSTER_DATA_URL;
-  else if(CURRENT_TOUR_OBJ) url = normalizePosterFromTour(CURRENT_TOUR_OBJ);
+document.getElementById('posterCopy').addEventListener('click', async ()=>{
+  let url='';
+  if(POSTER_DATA_URL && !POSTER_CLEAR) url=POSTER_DATA_URL;
+  else if (CURRENT_TOUR_OBJ) url = normalizePosterFromFields(CURRENT_TOUR_OBJ.posterUrl, CURRENT_TOUR_OBJ.posterId);
   if(!url) return;
   try{ await navigator.clipboard.writeText(url); alert('복사되었습니다.'); }catch{ alert('복사 실패'); }
 });
@@ -562,7 +604,6 @@ function updateStatusBadge(){ const rs=$('#regStart').value||''; const re=$('#re
 ['regStart','regEnd'].forEach(id=>$('#'+id).addEventListener('change',updateStatusBadge));
 function pickFirst(obj, keys){ for(const k of keys){ if(obj && obj[k]) return obj[k]; } return ''; }
 
-/* ▲ 로더를 async 로 유지하여 포스터를 현재 필드로 그림 */
 async function loadTourToForm(t, locked=true){
   const id = t?.tourId || t?.TourID || '';
   CURRENT_TOUR_ID=id; CURRENT_TOUR_OBJ=t||null;
@@ -571,7 +612,7 @@ async function loadTourToForm(t, locked=true){
   $('#tourName').value = t?.name || '';
   $('#tourUrl').value  = t?.url  || '';
 
-  await renderPoster();  // posterId/posterUrl 기준 미리보기
+  await renderPoster();
 
   $('#tourStart').value= toInputDateOnly(t?.start);
   $('#tourEnd').value  = toInputDateOnly(t?.end);
@@ -632,7 +673,7 @@ async function doSave(){
   }
 
   try{
-    const j=await postJSONCompat(['upserttournament','upsert_tournament','UPSERTTOURNAMENT'], base);
+    const j=await postJSONCompat(['upsertTournament','upsert_tournament','UPSERTTOURNAMENT'], base);
     if (!isSuccessResponse(j)) {
       const msg = j?.error || j?.message || j?.msg || '서버 응답을 이해할 수 없습니다.';
       return alert('저장 실패: ' + msg);
@@ -641,7 +682,7 @@ async function doSave(){
     if(j.tourId){ $('#tourId').value=j.tourId; CURRENT_TOUR_ID=j.tourId; CURRENT_TOUR_OBJ=TOURS[j.tourId]||CURRENT_TOUR_OBJ; }
     alert('저장되었습니다.');
     POSTER_DATA_URL=''; POSTER_CLEAR=false; DIRTY=false; setLocked(true); $('#tourFormTitle').textContent='대회 수정 (읽기 전용)';
-    await renderPoster(); // 저장 후 재확인
+    await renderPoster();
   }catch(e){
     alert('저장 실패: ' + (e?.message || e));
   }
@@ -657,7 +698,7 @@ async function doDelete(){
 
   const payload={ tourId: CURRENT_TOUR_ID, adminCode };
   try{
-    const j = await postJSONCompat(['removetournament','remove_tournament','deleteTournament','delete_tournament'], payload);
+    const j = await postJSONCompat(['deleteTournament','removeTournament','delete_tournament','remove_tournament'], payload);
     if (!isSuccessResponse(j)) {
       const msg = j?.error || j?.message || j?.msg || '서버 응답을 이해할 수 없습니다.';
       return alert('삭제 실패: ' + msg);
