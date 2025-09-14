@@ -250,83 +250,7 @@ function normalizePlayer(p, team){
   };
 }
 
-/* ========= (추가) 선수배열 탐색/폴백 유틸 ========= */
-function looksLikePlayer(o){
-  if(!o || typeof o!=='object') return false;
-  const keys = Object.keys(o);
-  const hasName = keys.some(k=>/player|name|선수|성명/i.test(k));
-  const hasNo   = keys.some(k=>/back|jersey|uniform|number|등번호/i.test(k));
-  return hasName || hasNo;
-}
-function firstArrayDeep(obj, keyHints=['rows','players','data','roster','members','athletes','items','list','result']){
-  const visited=new Set();
-  const q=[obj];
-  while(q.length){
-    const cur=q.shift();
-    if(!cur || typeof cur!=='object') continue;
-    if(visited.has(cur)) continue; visited.add(cur);
-    for(const k of Object.keys(cur)){
-      const v=cur[k];
-      if(Array.isArray(v) && v.length && typeof v[0]==='object'){
-        if(keyHints.includes(k) || looksLikePlayer(v[0])) return v;
-      }else if(v && typeof v==='object'){
-        q.push(v);
-      }
-    }
-  }
-  return null;
-}
-async function tryFetchArray(paths=[], paramVariants=[{}]){
-  for(const p of paths){
-    for(const q of paramVariants){
-      try{
-        const j=await getJSON(apiUrl(p, q));
-        let arr=null;
-        if(Array.isArray(j?.rows)) arr=j.rows;
-        else if(Array.isArray(j?.players)) arr=j.players;
-        else if(Array.isArray(j?.data)) arr=j.data;
-        if(!arr) arr = firstArrayDeep(j);
-        if(Array.isArray(arr)) return arr;
-      }catch(e){ /* ignore */ }
-    }
-  }
-  return null;
-}
-function filterByTeam(rows, team){
-  const id=String(team.teamId||'').trim();
-  const ko=(team.teamNameKo||'').trim();
-  const en=(team.teamNameEn||'').trim();
-
-  const getTeamIdFromRow = r=>{
-    const k = ['teamId','TeamID','team_id','tid','팀ID'];
-    for(const key of k){ if(r[key]!=null) return String(r[key]).trim(); }
-    return '';
-  };
-  const getTeamNameFromRow = r=>{
-    const koKeys=['teamNameKo','team_name_ko','teamName','team_name','팀명','팀명한글'];
-    const enKeys=['teamNameEn','team_name_en','engName','englishName','팀명영문'];
-    const koVal = koKeys.map(k=>r[k]).find(v=>v!=null && String(v).trim()!=='');
-    const enVal = enKeys.map(k=>r[k]).find(v=>v!=null && String(v).trim()!=='');
-    return {ko:(koVal||'').trim(), en:(enVal||'').trim()};
-  };
-  const norm = s=>String(s||'').toLowerCase().replace(/\s+/g,'').trim();
-
-  // teamId 우선
-  let out = rows.filter(r=> getTeamIdFromRow(r) === id );
-  if(out.length>0) return out;
-
-  // 팀명으로 대체 매칭
-  out = rows.filter(r=>{
-    const n = getTeamNameFromRow(r);
-    return (ko && norm(n.ko)===norm(ko)) || (en && norm(n.en)===norm(en));
-  });
-  if(out.length>0) return out;
-
-  // 그대로 반환(서버가 이미 팀별로 내려준 경우)
-  return rows;
-}
-
-/* ========= 기존 API 유틸 ========= */
+/* API 폴백 로더 */
 async function health(){
   try{
     setHealth('#3b82f6','연결 확인 중…');
@@ -354,46 +278,6 @@ async function fetchTeamById(teamId){
   return {teamId, teamNameKo:'', teamNameEn:''};
 }
 
-/* ========= (대체) 강화된 선수 로더 ========= */
-async function fetchPlayersOfTeamStrong(team){
-  const teamId = team.teamId;
-  const tourId = team.tourId || '';
-
-  // 1) 메인 경로 + 다양한 파라미터 시도
-  const pathsMain = ['players','teamplayers','team_players','teamroster','team_roster','roster','memberlist','members','athletes','playerlist','getplayers','list_players'];
-  const paramVariants = [
-    {teamId}, {TeamID:teamId}, {team_id:teamId}, {id:teamId},
-    tourId?{teamId, tourId}:null,
-    tourId?{team_id:teamId, tourId}:null,
-    tourId?{teamId, tournamentId:tourId}:null
-  ].filter(Boolean);
-
-  let arr = await tryFetchArray(pathsMain, paramVariants);
-  if(Array.isArray(arr)) return filterByTeam(arr, team);
-
-  // 2) 팀 상세 안에 중첩된 players/roster 탐색
-  const teamDetailPaths=['team','getteam','teamdetail','team_detail','teaminfo','team_info','Team'];
-  const teamDetailParamVariants = [{teamId},{TeamID:teamId},{team_id:teamId},{id:teamId}];
-  for(const p of teamDetailPaths){
-    for(const q of teamDetailParamVariants){
-      try{
-        const j=await getJSON(apiUrl(p,q));
-        const nested = firstArrayDeep(j);
-        if(Array.isArray(nested)) return filterByTeam(nested, team);
-      }catch{}
-    }
-  }
-
-  // 3) 전체 목록을 받아 필터링(최후 폴백)
-  const allParamVariants = tourId ? [{tourId},{tournamentId:tourId},{TourID:tourId},{}] : [{}];
-  arr = await tryFetchArray(pathsMain, allParamVariants);
-  if(Array.isArray(arr)) return filterByTeam(arr, team);
-
-  // 4) 그래도 없으면 빈 배열
-  return [];
-}
-
-/* ========= (원본) 단순 선수 로더 — 보존 (미사용) ========= */
 async function fetchPlayersOfTeam(teamId){
   const paths=['players','teamplayers','team_players','roster','playerlist','getplayers'];
   for(const p of paths){
@@ -464,11 +348,10 @@ function updateSelectedCount(players){
     $('#teamNameKo').textContent = team.teamNameKo || '(팀명 미기입)';
     $('#teamNameEn').textContent = team.teamNameEn || '';
 
-    // ▼ 변경: 강화된 선수 로더 사용
-    let rawPlayers = await fetchPlayersOfTeamStrong(team);
+    const rawPlayers = await fetchPlayersOfTeam(teamId);
     let players = rawPlayers.map(p=>normalizePlayer(p, team));
 
-    // ▶ 등번호 오름차순 정렬 (원본 유지)
+    // ▶ 등번호 오름차순 정렬 (요청 반영)
     players.sort((a,b)=>{
       const an = a._sortBackNum, bn = b._sortBackNum;
       if(an==null && bn==null){
