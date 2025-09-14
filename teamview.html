@@ -1,3 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TeamView</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --blue:#1769ff; --bg:#f6f8fb; --card:#fff; --muted:#6b7684; --green:#16a34a; --ink:#1f2937 }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);font-family:'Pretendard','Apple SD Gothic Neo',system-ui,-apple-system,sans-serif;color:var(--ink)}
+  .wrap{max-width:1100px;margin:18px auto;padding:0 12px 48px}
+  header{display:flex;justify-content:space-between;align-items:center;margin:10px 0 10px}
+  h1{font-size:18px;margin:0}.muted{color:var(--muted);font-size:12px}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:12px}
+  .btn{padding:9px 12px;border-radius:12px;border:1px solid #dfe6ee;background:#fff;cursor:pointer;white-space:nowrap}
+  .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 10px}
+  .team-head{display:flex;flex-direction:column;gap:4px}
+  .team-names{font-size:16px;font-weight:700}.team-names .en{font-weight:600;color:#64748b}
+  .stat{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .badge{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:#334155;background:#f1f5fb;border:1px solid #e4ecf7;border-radius:999px;padding:4px 8px}
+  .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:8px 12px;background:#fff;font-size:13px}
+  .count{font-weight:700}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+  .actions .btn{height:36px}
+  .table-wrap{overflow:auto;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:10px}
+  table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #e6ecf5;border-radius:12px;table-layout:fixed}
+  thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:center;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
+  tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff;text-align:center}
+  tbody tr:last-child td{border-bottom:none}
+  col.col-teamko{width:12.6%}col.col-teamen{width:12.6%}col.col-pname{width:10.8%}
+  col.col-no{width:10%}col.col-pos{width:9%}col.col-birth{width:20%}
+  col.col-age{width:9%}col.col-elite{width:8%}col.col-attend{width:8%}
+  td,th{word-break:keep-all; overflow-wrap:anywhere; line-height:1.35}.nowrap{white-space:nowrap}
+  tbody tr.attend-checked{background:linear-gradient(0deg, rgba(22,163,74,.06), rgba(22,163,74,.06))}
+  tbody tr.attend-checked td{border-bottom-color:#d1fae5}
+  .print-only{display:none}.screen-only{display:initial}
+  @page{ size:A4 portrait; margin:12mm }
+  @media print{
+    body{background:#fff}.wrap{max-width:none;margin:0;padding:0}
+    header,.screen-only{display:none !important}.table-wrap{box-shadow:none;border:0;padding:0}
+    table{border:0;border-spacing:0}thead th,tbody td{border:1px solid #ddd;text-align:center !important}
+    thead th{background:#f3f4f6 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    tbody tr:not(.attend-checked){display:none}.attend-box{display:none !important}.attend-mark{display:inline !important}
+    tr{break-inside:avoid;page-break-inside:avoid}td.nowrap,th.nowrap{white-space:nowrap !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TeamView</h1>
+    <span class="muted screen-only" id="healthDot" title="연결상태">●</span>
+  </header>
+
+  <div class="card topbar">
+    <div class="team-head">
+      <div class="team-names">
+        <span id="teamNameKo">팀명(한글)</span>
+        <span class="en" id="teamNameEn">Team Name (EN)</span>
+      </div>
+      <div class="stat">
+        <span class="badge">팀 ID: <span id="teamIdBadge">-</span></span>
+        <span class="pill">선수 <b class="count" id="playerCount">0</b>명</span>
+        <span class="pill">출석 선택 <b class="count" id="selectedCount">0</b>명</span>
+      </div>
+    </div>
+    <div class="actions screen-only">
+      <label class="pill" title="목록 전체 선택/해제">
+        <input type="checkbox" id="checkAll" />&nbsp;출석 전체선택
+      </label>
+      <button class="btn" id="reloadBtn">새로고침</button>
+      <button class="btn primary" id="printBtn">프린트/저장</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="playerTable" aria-label="팀 선수 목록">
+      <colgroup>
+        <col class="col-teamko"><col class="col-teamen"><col class="col-pname">
+        <col class="col-no"><col class="col-pos"><col class="col-birth">
+        <col class="col-age"><col class="col-elite"><col class="col-attend">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>한글팀명</th>
+          <th>영문팀명</th>
+          <th>선수이름</th>
+          <th class="nowrap">등번호</th>
+          <th class="nowrap">포지션</th>
+          <th class="nowrap">생년월일<br><span class="muted">(YYYY-MM-DD)</span></th>
+          <th class="nowrap">만나이</th>
+          <th class="nowrap">선출</th>
+          <th class="nowrap">출석</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="muted" style="margin-top:8px">
+    ※ 인쇄 시 <b>출석 체크된 선수만</b> A4 세로로 출력됩니다.
+  </div>
+</div>
+
 <script>
 /* ===== 상수/설정 ===== */
 const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
@@ -245,3 +352,5 @@ function updateSelectedCount(players){ $('#selectedCount').textContent = String(
   }
 })();
 </script>
+</body>
+</html>
