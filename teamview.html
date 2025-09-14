@@ -106,48 +106,49 @@
 </div>
 
 <script>
-/* ===== 상수/설정 ===== */
+/* ====== 1) 웹앱 URL 고정 ====== */
 const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 function validWebAppUrl(u){ return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(\?.*)?$/i.test((u||'').trim()); }
 function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name)||''; }
-/* ▶ 기본은 항상 DEFAULT를 사용. 이전에 저장된 appUrl은 무시 */
 let WEB_APP_URL = DEFAULT_WEB_APP_URL;
-/* ▶ 필요하면 ?app=... 으로만 임시 오버라이드 */
-const appOverride = getParam('app');
-if (validWebAppUrl(appOverride)) WEB_APP_URL = appOverride;
+const appOverride = getParam('app'); if (validWebAppUrl(appOverride)) WEB_APP_URL = appOverride;
 
-/* ===== (이하 유틸/로직) ===== */
+/* ====== 공통 유틸 ====== */
 function setHealth(color, tip){ const dot=document.getElementById('healthDot'); if(!dot) return; dot.style.color=color; dot.title=tip||''; }
 const $=s=>document.querySelector(s);
 const pad=n=>String(n).padStart(2,'0');
 function apiUrl(path,q={}){ const u=new URL(WEB_APP_URL); u.searchParams.set('path', path); Object.entries(q||{}).forEach(([k,v])=>u.searchParams.set(k,v)); return u.toString(); }
 async function getJSON(u){ const r=await fetch(u,{cache:'no-store',mode:'cors'}); const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); } }
-const truthyFlag=(v)=>{ if (v===true||v===1) return true; if(typeof v==='string'){ const s=v.trim().toLowerCase(); if(['true','ok','success','done','1','yes','y','o','on','t','확인','예','선출','유'].includes(s)) return true; } return false; };
+function canon(s){ return String(s||'').toLowerCase().replace(/[\s_\-]/g,'').trim(); }
+const truthyFlag=(v)=>{ if (v===true||v===1) return true; if(typeof v==='string'){ const s=v.trim().toLowerCase(); if(['true','ok','success','done','1','yes','y','o','on','t','확인','예','유','선출'].includes(s)) return true; } return false; };
 
-/* 날짜/정규화 유틸 */
-function parseDateLoose(v){ if(!v) return null; if(v instanceof Date && !isNaN(v)) return v; if(typeof v==='number'){ const d=new Date(v); return isNaN(d)?null:d; } const s=String(v).trim(); const digits=s.replace(/\D/g,''); if(digits.length===8){ const y=+digits.slice(0,4), m=+digits.slice(4,6)-1, d=+digits.slice(6,8); const dt=new Date(y,m,d); if(!isNaN(dt)) return dt; } const d=new Date(s); return isNaN(d)?null:d; }
+/* ====== 날짜/정규화 ====== */
+function parseDateLoose(v){
+  if(!v) return null; if(v instanceof Date && !isNaN(v)) return v;
+  if(typeof v==='number'){ const d=new Date(v); return isNaN(d)?null:d; }
+  const s=String(v).trim(); const digits=s.replace(/\D/g,'');
+  if(digits.length===8){ const y=+digits.slice(0,4), m=+digits.slice(4,6)-1, d=+digits.slice(6,8); const dt=new Date(y,m,d); if(!isNaN(dt)) return dt; }
+  const d=new Date(s); return isNaN(d)?null:d;
+}
 function fmtYMDOnly(v){ const d=parseDateLoose(v); if(!d) return ''; return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function calcAge(dob, asOf){ const b=parseDateLoose(dob); if(!b) return ''; const ref=asOf?parseDateLoose(asOf):new Date(); if(!ref) return ''; let age=ref.getFullYear()-b.getFullYear(); const m=ref.getMonth()-b.getMonth(); if(m<0 || (m===0 && ref.getDate()<b.getDate())) age--; return String(age); }
 function pick(o, keys=[], fallback=''){ for(const k of keys){ if(o && o[k]!=null && String(o[k]).trim()!=='') return o[k]; } return fallback; }
-function canon(s){ return String(s||'').toLowerCase().replace(/[\s_\-]/g,'').trim(); }
 
-/* ===== rows 파서: 헤더 자동판별 개선 (중요 Fix) ===== */
+/* ====== 2) 표/헤더 파서(헤더 자동 감지) ====== */
 function looksLikeHeaderRow(row){
   const toks = row.map(v=>String(v||'').trim().toLowerCase());
   const HINTS = new Set([
-    'teamid','team_id','팀id','팀id','팀아이디','id',
-    'teamname','teamnameko','teamnameen','한글팀명','영문팀명','팀명','팀명한글','팀명영문',
-    '선수','선수이름','이름','name','nameko','nameen',
+    'playerid','teamid','team_id','팀id','id',
+    'teamnameko','teamnameen','한글팀명','영문팀명',
+    '선수이름','이름','name','nameko','nameen',
     '등번호','number','no','jerseyno','uniformno',
     'position','pos','포지션','포지션명',
     'birth','birthdate','birthday','생년월일',
     'age','만나이','나이',
-    'elite','선출','선출여부',
-    'attend','출석'
+    'elite','선출','선출여부','attend','출석'
   ]);
-  let hit=0;
-  for(const t of toks){ if(HINTS.has(t) || /번호|포지|birth|age|나이|team|선수|출석/.test(t)) hit++; }
-  return hit>=2; // 2개 이상 헤더스러운 토큰이면 헤더로 간주
+  let hit=0; for(const t of toks){ if(HINTS.has(t) || /번호|포지|birth|age|나이|team|선수|출석/.test(t)) hit++; }
+  return hit>=2;
 }
 function arrayRowsToObjects(rows, headerFrom) {
   if (!Array.isArray(rows) || !rows.length) return [];
@@ -159,10 +160,11 @@ function arrayRowsToObjects(rows, headerFrom) {
     data = rows.slice(1);
   }
   if (!header){
-    // 헤더가 확신되지 않으면 Players 표준 순서를 가정(PCOL)
+    // Players 표준 순서 가정
     return data.map(r => ({
-      PlayerID: r[0], TeamID: r[1], Name: r[2], Number: r[3], Position: r[4],
-      Birth: r[5], Age: r[6], Elite: r[7], CreatedAt: r[8], Attend: r[9],
+      PlayerID: r[0], TeamID: r[1], teamNameKo: r[2], teamNameEn: r[3],
+      '선수이름': r[4], '등번호': r[5], '포지션': r[6], '생년월일': r[7],
+      '만나이': r[8], '선출여부': r[9], '등록일시': r[10], '출석': r[11],
     }));
   }
   return data.map(r => { const o={}; header.forEach((h,i)=>o[h]=r[i]); return o; });
@@ -177,15 +179,15 @@ function rowsToObjectsFlexible(payload){
   const header = Array.isArray(payload.header) ? payload.header : null;
   if (!rows) return [];
   if (rows.length && Array.isArray(rows[0])) return arrayRowsToObjects(rows, header);
-  return rows; // 이미 객체 배열
+  return rows;
 }
 
-/* ===== 팀/선수 정규화: 한글/영문/‘선출’ 변경 대응 ===== */
+/* ====== 3) 팀/선수 정규화 (한글/영문/선출 인식) ====== */
 function normalizeTeam(t){
   if(!t) return {teamId:'', teamNameKo:'', teamNameEn:'', teamCode:''};
   const teamId     = pick(t,['teamId','TeamID','id','Id','팀ID','tid','팀id']);
-  const teamNameKo = pick(t,['teamNameKo','teamName','nameKo','name','team_name_ko','팀명','팀명한글','한글팀명']); // ← 한글팀명 포함
-  const teamNameEn = pick(t,['teamNameEn','nameEn','team_name_en','engName','englishName','팀명영문','영문팀명']); // ← 영문팀명 포함
+  const teamNameKo = pick(t,['teamNameKo','teamName','nameKo','name','team_name_ko','팀명','팀명한글','한글팀명']);
+  const teamNameEn = pick(t,['teamNameEn','nameEn','team_name_en','engName','englishName','팀명영문','영문팀명']);
   const teamCode   = pick(t,['teamCode','code','팀코드','abbr','약칭','shortname']) || teamNameEn;
   return { teamId, teamNameKo, teamNameEn, teamCode, raw:t };
 }
@@ -195,8 +197,8 @@ function normalizePlayer(p, team){
   const backNo   = pick(p,['backNumber','backNo','jersey','jerseyNo','uniformNo','uniform','number','no','jerseyNumber','등번호','Number']);
   const pos      = pick(p,['position','pos','포지션','포지션명','Position']);
   const birth    = pick(p,['dob','birth','birthDate','birthday','생년월일','출생','Birth']);
-  const age      = pick(p,['age','Age']);
-  const elite    = ['elite','isElite','pro','selected','선출','선출여부','Elite'].some(k=>truthyFlag(p?.[k])); // ← ‘선출’/‘선출여부’ 모두 지원
+  const age      = pick(p,['age','Age','만나이']);
+  const elite    = ['elite','isElite','pro','selected','선출','선출여부','Elite'].some(k=>truthyFlag(p?.[k]));
   return {
     teamNameKo: team.teamNameKo||'',
     teamNameEn: team.teamNameEn||'',
@@ -206,13 +208,13 @@ function normalizePlayer(p, team){
     birthYMD: fmtYMDOnly(birth),
     age: age ? String(age) : calcAge(birth),
     elite: elite?'O':'',
-    attend: !!truthyFlag(p?.Attend || p?.attend),
+    attend: !!truthyFlag(p?.Attend || p?.attend || p?.출석),
     _sortBackNum: parseBackNoToNum(backNo),
     _raw: p
   };
 }
 
-/* ===== API 호출 ===== */
+/* ====== 4) API 호출 ====== */
 async function health(){
   try{
     setHealth('#3b82f6','연결 확인 중…');
@@ -222,11 +224,13 @@ async function health(){
   }catch(e){ setHealth('#ef4444','연결 실패'); return false; }
 }
 async function fetchTeamById(teamId){
+  // 1) 단건
   try{
     const j=await getJSON(apiUrl('team',{teamId}));
     const cand = j?.data || j?.team || j?.row;
     if(cand) return normalizeTeam(cand);
   }catch{}
+  // 2) 목록에서 찾기
   try{
     const j=await getJSON(apiUrl('teams'));
     const rows=rowsToObjectsFlexible(j);
@@ -236,14 +240,23 @@ async function fetchTeamById(teamId){
   return {teamId, teamNameKo:'', teamNameEn:'', teamCode:''};
 }
 
-/* 팀 매칭(클라 폴백) */
+/* ====== 5) 팀 매칭(클라 폴백) — ★ teamNameKo 확실히 포함 ★ ====== */
 function playerMatchesTeamLocally(p, team){
-  const idCands = [ team.teamId, team.raw?.TeamID, team.raw?.teamId, team.raw?.id ].filter(Boolean).map(String);
+  const idCands   = [ team.teamId, team.raw?.TeamID, team.raw?.teamId, team.raw?.id ].filter(Boolean).map(String);
   const nameCands = [ team.teamNameEn, team.teamNameKo, team.teamCode ].filter(Boolean).map(String);
-  const keysId   = ['TeamID','teamId','team_id','TEAMID','팀ID','tid','id'];
-  const keysName = ['teamNameEn','team_name_en','영문팀명','영문명','Team','team','팀','팀명','팀명한글','한글팀명','nameEn','nameKo','teamCode','team_code','코드','팀코드','abbr','약칭','short','tag','key'];
+  const keysId    = ['TeamID','teamId','team_id','TEAMID','팀ID','tid','id'];
+  const keysName  = [
+    'teamNameEn','team_name_en','영문팀명','영문명',
+    'teamNameKo','team_name_ko','한글팀명','팀명한글', // ← 추가
+    'Team','team','팀','팀명',
+    'nameEn','nameKo',
+    'teamCode','team_code','코드','팀코드','abbr','약칭','short','tag','key'
+  ];
+  // 1) ID 직접
   for (const k of keysId){ const v=p[k]; if(!v) continue; for(const id of idCands){ if(String(v).trim()===String(id).trim()) return true; } }
+  // 2) 이름/코드 근사
   for (const k of keysName){ const v=p[k]; if(!v) continue; for(const nm of nameCands){ if(canon(v)===canon(nm)) return true; } }
+  // 3) 느슨한 키
   for (const [k,v] of Object.entries(p||{})){ const ck=k.toLowerCase().replace(/[\s_\-]/g,''); if(!v) continue;
     if (['team','팀','팀명','영문팀명','한글팀명','teamnameen','teamnameko','teamcode','코드','팀코드','abbr','약칭','short','nameen','nameko'].includes(ck)){
       for (const nm of nameCands){ if(canon(v)===canon(nm)) return true; }
@@ -252,35 +265,42 @@ function playerMatchesTeamLocally(p, team){
   return false;
 }
 
+/* ====== 6) 선수 로드 — 엔드포인트 후보 대폭 확장 ====== */
 async function fetchPlayersOfTeam(team){
   const teamId = String(team.teamId||'').trim();
-  const tryPaths = [
-    ['teamplayers', true], // 서버가 팀별 제공하면 최우선
-    ['players',     true], // players?teamId=...
-    ['players',     false] // 전체 받고 클라 필터
-  ];
-  let all = [];
-  for(const [path, passTeam] of tryPaths){
+
+  // (A) 팀ID를 쿼리로 넘겨보는 후보
+  const withTeam = ['teamplayers','team_players','players','roster','playerlist','getplayers','getPlayers','listPlayers','list_players','teamRoster','team_roster'];
+  // (B) 전체를 받아서 클라에서 필터
+  const noTeam   = ['players','roster','playerlist','getplayers','getPlayers','listPlayers','list_players','allplayers','players_all'];
+
+  // 1) 서버가 팀별 반환해주면 그걸 우선 사용
+  for(const p of withTeam){
     try{
-      const url = passTeam ? apiUrl(path,{teamId}) : apiUrl(path);
-      const j=await getJSON(url);
+      const j=await getJSON(apiUrl(p,{teamId}));
       const rows = rowsToObjectsFlexible(j);
-      if(!rows.length) continue;
-      if(passTeam) return rows; else all = rows;
+      if (Array.isArray(rows) && rows.length){
+        console.log(`[TeamView] Using endpoint: ${p}?teamId=...  → ${rows.length} rows`);
+        return rows;
+      }
     }catch(e){}
   }
-  if (all && all.length){
-    const filtered = all.filter(r => playerMatchesTeamLocally(r, team));
-    console.groupCollapsed('[TeamView] Local filter used');
-    console.log('Team:', team);
-    console.log('All players:', all.length, '→ Matched:', filtered.length);
-    console.groupEnd();
-    return filtered;
+  // 2) 폴백: 전체 받아서 팀 매칭
+  for(const p of noTeam){
+    try{
+      const j=await getJSON(apiUrl(p));
+      const all = rowsToObjectsFlexible(j);
+      if (Array.isArray(all) && all.length){
+        const filtered = all.filter(r => playerMatchesTeamLocally(r, team));
+        console.warn(`[TeamView] Local filter used. Endpoint: ${p} → all=${all.length}, matched=${filtered.length}`);
+        return filtered;
+      }
+    }catch(e){}
   }
   return [];
 }
 
-/* 렌더링 */
+/* ====== 7) 렌더링 ====== */
 function rowHtml(v, idx){
   const checkedCls = v.attend ? 'attend-checked' : '';
   return `
@@ -307,14 +327,13 @@ function renderTable(players){
       const idx=+e.target.getAttribute('data-idx');
       players[idx].attend = !!e.target.checked;
       const tr = e.target.closest('tr');
-      if(players[idx].attend) tr.classList.add('attend-checked'); else tr.classList.remove('attend-checked');
-      updateSelectedCount(players);
+      tr?.classList.toggle('attend-checked', players[idx].attend);
+      $('#selectedCount').textContent = String(players.filter(p=>p.attend).length);
     });
   });
 }
-function updateSelectedCount(players){ $('#selectedCount').textContent = String(players.filter(p=>p.attend).length); }
 
-/* 부팅 */
+/* ====== 8) 부팅 ====== */
 (async function boot(){
   await health().catch(()=>{});
   const teamId = getParam('teamId') || '';
@@ -328,6 +347,7 @@ function updateSelectedCount(players){ $('#selectedCount').textContent = String(
     const rawPlayers = await fetchPlayersOfTeam(team);
     let players = rawPlayers.map(p=>normalizePlayer(p, team));
 
+    // 등번호 오름차순 정렬(숫자 우선)
     players.sort((a,b)=>{
       const an=a._sortBackNum, bn=b._sortBackNum;
       if(an==null && bn==null) return String(a.backNumber||'').localeCompare(String(b.backNumber||''));
@@ -336,12 +356,15 @@ function updateSelectedCount(players){ $('#selectedCount').textContent = String(
 
     $('#playerCount').textContent = String(players.length);
     renderTable(players);
-    updateSelectedCount(players);
+    $('#selectedCount').textContent = String(players.filter(p=>p.attend).length);
 
     const toggleAll = (checked)=>{
-      const cbs = document.querySelectorAll('.attend-box');
-      cbs.forEach((cb, i)=>{ cb.checked = checked; players[i].attend = checked; const tr=cb.closest('tr'); tr?.classList.toggle('attend-checked', checked); });
-      updateSelectedCount(players);
+      document.querySelectorAll('.attend-box').forEach((cb,i)=>{
+        cb.checked = checked;
+        players[i].attend = checked;
+        cb.closest('tr')?.classList.toggle('attend-checked', checked);
+      });
+      $('#selectedCount').textContent = String(players.filter(p=>p.attend).length);
     };
     document.getElementById('checkAll')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
     document.getElementById('reloadBtn')?.addEventListener('click', ()=>location.reload());
