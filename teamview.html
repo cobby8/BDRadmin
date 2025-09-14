@@ -13,30 +13,40 @@
   .wrap{max-width:1100px;margin:18px auto;padding:0 12px 48px}
   header{display:flex;justify-content:space-between;align-items:center;margin:10px 0 10px}
   h1{font-size:18px;margin:0}.muted{color:var(--muted);font-size:12px}
+
   .card{background:var(--card);border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:12px}
   .btn{padding:9px 12px;border-radius:12px;border:1px solid #dfe6ee;background:#fff;cursor:pointer;white-space:nowrap}
   .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+
   .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 10px}
   .team-head{display:flex;flex-direction:column;gap:4px}
-  .team-names{font-size:16px;font-weight:700}.team-names .en{font-weight:600;color:#64748b}
+  .team-names{font-size:16px;font-weight:700}
+  .team-names .en{font-weight:600;color:#64748b}
   .stat{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .badge{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:#334155;background:#f1f5fb;border:1px solid #e4ecf7;border-radius:999px;padding:4px 8px}
   .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:8px 12px;background:#fff;font-size:13px}
   .count{font-weight:700}
   .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
   .actions .btn{height:36px}
+
   .table-wrap{overflow:auto;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:10px}
   table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #e6ecf5;border-radius:12px;table-layout:fixed}
   thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:center;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
   tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff;text-align:center}
   tbody tr:last-child td{border-bottom:none}
+
   col.col-teamko{width:12.6%}col.col-teamen{width:12.6%}col.col-pname{width:10.8%}
   col.col-no{width:10%}col.col-pos{width:9%}col.col-birth{width:20%}
   col.col-age{width:9%}col.col-elite{width:8%}col.col-attend{width:8%}
-  td,th{word-break:keep-all; overflow-wrap:anywhere; line-height:1.35}.nowrap{white-space:nowrap}
+
+  td,th{word-break:keep-all; overflow-wrap:anywhere; line-height:1.35}
+  .nowrap{white-space:nowrap}
+
   tbody tr.attend-checked{background:linear-gradient(0deg, rgba(22,163,74,.06), rgba(22,163,74,.06))}
   tbody tr.attend-checked td{border-bottom-color:#d1fae5}
+
   .print-only{display:none}.screen-only{display:initial}
+
   @page{ size:A4 portrait; margin:12mm }
   @media print{
     body{background:#fff}.wrap{max-width:none;margin:0;padding:0}
@@ -106,27 +116,49 @@
 </div>
 
 <script>
-/* ========== 설정 ========== */
+/* ==================== 설정 ==================== */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz1qk5MbQvVU3d8Qs3EcPO792iBNlVQR71WhCpNbkqzCcdn5gM17Hqx9AUAIGUwwSKCww/exec';
 
-/* ========== 유틸 ========== */
-const $=s=>document.querySelector(s);
+/* ==================== 유틸 ==================== */
+const $ = s => document.querySelector(s);
 function apiUrl(path,q={}){ const u=new URL(WEB_APP_URL); u.searchParams.set('path', path); for(const [k,v] of Object.entries(q)) u.searchParams.set(k,v); return u.toString(); }
 function setHealth(color, tip){ const d=$('#healthDot'); if(d){ d.style.color=color; d.title=tip||''; } }
 function fetchJSON(url, timeoutMs=8000){
-  const c = new AbortController(); const id = setTimeout(()=>c.abort(), timeoutMs);
+  const c = new AbortController(); const id=setTimeout(()=>c.abort(), timeoutMs);
   return fetch(url,{cache:'no-store',mode:'cors',signal:c.signal})
-    .then(r=>r.text()).then(t=>{ clearTimeout(id); return JSON.parse(t); });
+    .then(r=>r.text())
+    .then(t=>{ clearTimeout(id); try{ return JSON.parse(t); }catch{ return {ok:false,error:'JSON parse error',raw:t}; } });
 }
 function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name)||''; }
-function pad(n){ return String(n).padStart(2,'0'); }
-function parseDateLoose(v){ if(!v) return null; if(v instanceof Date && !isNaN(v)) return v; if(typeof v==='number'){ const d=new Date(v); return isNaN(d)?null:d; } const s=String(v).trim(); const d8=s.replace(/\D/g,''); if(d8.length===8){ const y=+d8.slice(0,4), m=+d8.slice(4,6)-1, d=+d8.slice(6,8); const dt=new Date(y,m,d); if(!isNaN(dt)) return dt; } const d=new Date(s); return isNaN(d)?null:d; }
+const pad = n => String(n).padStart(2,'0');
+function parseDateLoose(v){
+  if(!v) return null; if(v instanceof Date && !isNaN(v)) return v;
+  if(typeof v==='number'){ const d=new Date(v); return isNaN(d)?null:d; }
+  const s=String(v).trim(); const d8=s.replace(/\D/g,'');
+  if(d8.length===8){ const y=+d8.slice(0,4), m=+d8.slice(4,6)-1, d=+d8.slice(6,8); const dt=new Date(y,m,d); if(!isNaN(dt)) return dt; }
+  const d=new Date(s); return isNaN(d)?null:d;
+}
 function fmtYMDOnly(v){ const d=parseDateLoose(v); return d?`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`:''; }
 function calcAge(dob, asOf){ const b=parseDateLoose(dob); if(!b) return ''; const r=asOf?parseDateLoose(asOf):new Date(); let a=r.getFullYear()-b.getFullYear(); const m=r.getMonth()-b.getMonth(); if(m<0||(m===0&&r.getDate()<b.getDate())) a--; return String(a); }
 function pick(o, keys=[], fallback=''){ for(const k of keys){ if(o && o[k]!=null && String(o[k]).trim()!=='') return o[k]; } return fallback; }
 function truthy(v){ if(v===true||v===1) return true; const s=String(v??'').trim().toLowerCase(); return ['true','1','ok','yes','y','o','on','t','확인','예','유','선출'].includes(s); }
+const canon = s => String(s||'').toLowerCase().replace(/[\s_\-]/g,'').trim();
 
-/* ========== 정규화 ========== */
+/* ===== rows/header 형태도 안전하게 객체로 변환 (teams 폴백용) ===== */
+function rowsToObjectsFlexible(payload){
+  if (!payload) return [];
+  const rows = Array.isArray(payload.rows) ? payload.rows
+             : Array.isArray(payload.data) ? payload.data
+             : Array.isArray(payload) ? payload : null;
+  const header = Array.isArray(payload.header) ? payload.header : null;
+  if (!rows) return [];
+  if (rows.length && Array.isArray(rows[0]) && header){
+    return rows.map(r => { const o={}; header.forEach((h,i)=>o[h]=r[i]); return o; });
+  }
+  return rows; // 이미 객체 배열
+}
+
+/* ==================== 정규화 ==================== */
 function normalizeTeam(t){
   return {
     teamId:     pick(t,['teamId','TeamID','id','팀ID','tid']),
@@ -157,7 +189,74 @@ function normalizePlayer(p, team){
   };
 }
 
-/* ========== 렌더링 ========== */
+/* ==================== 데이터 로더 ==================== */
+// 팀 메타: team → 실패 시 teams 검색 → 레거시(getteam/teaminfo) 짧은 폴백
+async function loadTeamMeta(teamId){
+  // 1) 표준 경로
+  try{
+    const t = await fetchJSON(apiUrl('team',{teamId}));
+    if (t?.ok && t.data) return normalizeTeam(t.data);
+    if (String(t?.error||'').includes('unknown path')){
+      for (const p of ['getteam','teaminfo']){
+        try{
+          const tt = await fetchJSON(apiUrl(p,{teamId}), 3000);
+          if (tt?.ok && tt.data) return normalizeTeam(tt.data);
+        }catch{}
+      }
+    }
+  }catch{}
+
+  // 2) teams 전체에서 검색
+  try{
+    const list = await fetchJSON(apiUrl('teams'));
+    const rows = rowsToObjectsFlexible(list);
+    const found = rows.find(r => String(
+      r.TeamID ?? r.teamId ?? r.team_id ?? r['팀ID'] ?? r.id ?? ''
+    ).trim() === String(teamId).trim());
+    if (found) return normalizeTeam(found);
+  }catch{}
+
+  // 3) 폴백 실패
+  return { teamId, teamNameKo:'', teamNameEn:'', teamCode:'' };
+}
+
+// 선수: 표준(players?teamId=) → unknown path면 레거시 한 번씩 시도 → 0건이면 전체 받아 로컬 매칭(1회)
+async function loadPlayers(team){
+  const teamId = String(team.teamId||'').trim();
+  let j = await fetchJSON(apiUrl('players',{teamId}));
+  if (!j?.ok && String(j?.error||'').includes('unknown path')){
+    const legacy = ['teamplayers','team_players','roster','playerlist','getplayers'];
+    for (const p of legacy){
+      try{
+        j = await fetchJSON(apiUrl(p,{teamId}), 3000);
+        if (j?.ok) break;
+      }catch{}
+    }
+  }
+  if (!j?.ok) throw new Error(j?.error || 'players API error');
+
+  // 서버가 0건 반환 시: 전체 받아서 이름/코드로 1회 로컬 매칭
+  let rows = Array.isArray(j.rows) ? j.rows : [];
+  if (!rows.length){
+    try{
+      const all = await fetchJSON(apiUrl('players'));
+      const allRows = Array.isArray(all?.rows) ? all.rows : [];
+      const names = [team.teamNameKo, team.teamNameEn, team.teamCode].filter(Boolean).map(canon);
+      rows = allRows.filter(r=>{
+        const v = canon(
+          r.teamNameKo || r['team_name_ko'] || r['한글팀명'] ||
+          r.teamNameEn || r['영문팀명']  || r.team || r['팀'] || r['팀명'] ||
+          r.teamCode   || r['팀코드']
+        );
+        return v && names.includes(v);
+      });
+      console.warn('[TeamView] local filter used:', { all: allRows.length, matched: rows.length });
+    }catch{}
+  }
+  return rows;
+}
+
+/* ==================== 렌더링 ==================== */
 function rowHtml(v, idx){
   return `
   <tr>
@@ -183,7 +282,7 @@ function bindAttend(players){
   });
 }
 
-/* ========== 메인 ========== */
+/* ==================== 부팅 ==================== */
 (async function boot(){
   try{
     setHealth('#3b82f6','연결 확인 중…');
@@ -196,30 +295,17 @@ function bindAttend(players){
   $('#teamIdBadge').textContent = teamId || '-';
   if(!teamId){ $('#teamNameKo').textContent='팀 ID가 없습니다'; $('#teamNameEn').textContent=''; return; }
 
-  // 팀 메타
   try{
-    const t = await fetchJSON(apiUrl('team',{teamId}));
-    const team = normalizeTeam(t?.data || {});
+    // 팀 메타 (표준→폴백 포함)
+    const team = await loadTeamMeta(teamId);
     $('#teamNameKo').textContent = team.teamNameKo || '(팀명 미기입)';
     $('#teamNameEn').textContent = team.teamNameEn || team.teamCode || '';
 
-// 선수 (표준 경로)
-let j = await fetchJSON(apiUrl('players',{teamId}));
+    // 선수
+    const raw = await loadPlayers(team);
+    const players = raw.map(p=>normalizePlayer(p, team));
 
-// ▶ 폴백: unknown path면 legacy 별칭 한 번만 시도(속도 영향 최소화, 3초 타임아웃)
-if (!j?.ok && String(j?.error||'').includes('unknown path')) {
-  const legacy = ['teamplayers','team_players','roster','playerlist','getplayers'];
-  for (const p of legacy) {
-    try {
-      j = await fetchJSON(apiUrl(p,{teamId}), 3000);
-      if (j?.ok) break;
-    } catch(_) {}
-  }
-}
-if (!j?.ok) throw new Error(j?.error || 'players API error');
-
-
-    const players = (j.rows||[]).map(p=>normalizePlayer(p, team));
+    // 등번호 오름차순(숫자 우선)
     players.sort((a,b)=>{
       const an=a._sortBackNum, bn=b._sortBackNum;
       if(an==null && bn==null) return String(a.backNumber||'').localeCompare(String(b.backNumber||''));
@@ -231,7 +317,7 @@ if (!j?.ok) throw new Error(j?.error || 'players API error');
     tbody.innerHTML = players.length ? players.map((p,i)=>rowHtml(p,i)).join('') : `<tr><td colspan="9" class="muted">데이터 없음</td></tr>`;
     bindAttend(players);
 
-    // UI 액션
+    // 상단 액션
     $('#checkAll')?.addEventListener('change', e=>{
       const checked = !!e.target.checked;
       document.querySelectorAll('.attend-box').forEach((cb,i)=>{
@@ -244,6 +330,7 @@ if (!j?.ok) throw new Error(j?.error || 'players API error');
     $('#printBtn')?.addEventListener('click', ()=>window.print());
 
   }catch(e){
+    console.error('[TeamView] boot error:', e);
     $('#teamNameKo').textContent='로드 실패';
     $('#teamNameEn').textContent=String(e?.message||e);
   }
