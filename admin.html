@@ -431,7 +431,6 @@ function setLocked(locked){
   $('#addPlaceBtn').disabled   = locked;
   $('#clearAllDivBtn').disabled = locked || DIV_STATE.length === 0;
 
-  // 편집중이면 수정 버튼 비활성, 읽기 전용(locked) 상태에만 활성
   const editBtn = $('#editBtn');
   if (editBtn) {
     editBtn.disabled = locked ? !CURRENT_TOUR_ID : true;
@@ -518,7 +517,7 @@ function openPlaceFloating(initName,onApply){
   openPopoverCentered(initName?'장소명 수정':'장소 추가', body, actions);
 }
 
-/* ========= 포스터: 업로드/미리보기 ========= */
+/* ========= 포스터: 업로드/미리보기(폴백 체인) ========= */
 let POSTER_DATA_URL='', POSTER_CLEAR=false;
 
 function extractDriveId(u){
@@ -530,29 +529,40 @@ function extractDriveId(u){
   m = s.match(/\/uc(?:\?[^#]*?)?\bid=([A-Za-z0-9_-]{10,})/); if(m) return m[1];
   return '';
 }
-function buildDriveViewUrl(id){ return 'https://drive.google.com/uc?export=view&id='+encodeURIComponent(id); }
+const buildView=id=>'https://drive.google.com/uc?export=view&id='+encodeURIComponent(id);
+const buildDown=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
+const buildThumb=(id,w=2000)=>'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w'+w;
+
 function normalizePosterFromFields(posterUrl, posterId){
+  // 반환: {primary, variants[]} (복사 버튼은 primary 사용)
+  const variants=[];
   const id = extractDriveId(posterId) || extractDriveId(posterUrl);
-  if (id) return buildDriveViewUrl(id);
-  const u = String(posterUrl||'');
-  if (/\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(u)) return u;
-  try{
-    const host = new URL(u).hostname;
-    if (/(^|\.)drive\.google\.com$/.test(host)) return u;
-    if (/(^|\.)googleusercontent\.com$/.test(host)) return u;
-    if (/(^|\.)ggpht\.com$/.test(host)) return u;
-  }catch(e){}
-  return '';
+  if(id){
+    variants.push(buildView(id));
+    variants.push(buildDown(id));
+    variants.push(buildThumb(id,2000));
+  }
+  const u = String(posterUrl||'').trim();
+  if(/\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(u) && !variants.includes(u)) variants.push(u);
+  if(/^https?:\/\//i.test(u) && !variants.includes(u)) variants.push(u);
+  return { primary: variants[0] || '', variants };
 }
 
 async function renderPoster(){
   const prev=$('#posterPreview');
   let showUrl = '';
+  let variants = [];
+
   if(POSTER_DATA_URL && !POSTER_CLEAR){
     showUrl = POSTER_DATA_URL;
+    variants = [POSTER_DATA_URL];
   }else if(!POSTER_CLEAR){
     const t = CURRENT_TOUR_OBJ;
-    if (t) showUrl = normalizePosterFromFields(t.posterUrl, t.posterId);
+    if (t){
+      const pack = normalizePosterFromFields(t.posterUrl, t.posterId);
+      showUrl = pack.primary;
+      variants = pack.variants;
+    }
   }
 
   if(!showUrl){
@@ -564,8 +574,15 @@ async function renderPoster(){
     $('#posterCopy').disabled=true; $('#posterClear').disabled=true;
     wirePosterInteractions();
   }else{
-    prev.innerHTML = `<img src="${showUrl}" alt="poster"> <div class="muted">${POSTER_DATA_URL?'업로드(미저장)':'현재 저장된 포스터'}</div>`;
+    prev.innerHTML = `<img id="posterImg" src="" alt="poster"> <div class="muted">${POSTER_DATA_URL?'업로드(미저장)':'현재 저장된 포스터'}</div>`;
+    const img=$('#posterImg');
+    let i=0;
+    const tryNext=()=>{ if(i>=variants.length){ img.removeAttribute('src'); return; } img.src=variants[i++]; };
+    img.onerror=tryNext; img.onload=()=>{};
+    tryNext();
     $('#posterCopy').disabled=false; $('#posterClear').disabled=false;
+    // 복사 버튼은 primary 기준
+    $('#posterCopy').dataset.copyUrl = variants[0] || showUrl;
   }
 }
 function wirePosterInteractions(){
@@ -591,9 +608,12 @@ async function fileToJpegDataUrl(file, maxW=1024, q=0.8){
   return canvas.toDataURL('image/jpeg', q);
 }
 document.getElementById('posterCopy').addEventListener('click', async ()=>{
-  let url='';
-  if(POSTER_DATA_URL && !POSTER_CLEAR) url=POSTER_DATA_URL;
-  else if (CURRENT_TOUR_OBJ) url = normalizePosterFromFields(CURRENT_TOUR_OBJ.posterUrl, CURRENT_TOUR_OBJ.posterId);
+  let url=$('#posterCopy').dataset.copyUrl||'';
+  if(!url && POSTER_DATA_URL && !POSTER_CLEAR) url=POSTER_DATA_URL;
+  else if(!url && CURRENT_TOUR_OBJ){
+    const pack = normalizePosterFromFields(CURRENT_TOUR_OBJ.posterUrl, CURRENT_TOUR_OBJ.posterId);
+    url = pack.primary || '';
+  }
   if(!url) return;
   try{ await navigator.clipboard.writeText(url); alert('복사되었습니다.'); }catch{ alert('복사 실패'); }
 });
