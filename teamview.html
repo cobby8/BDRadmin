@@ -39,16 +39,21 @@
   tbody td{font-size:14px;border-bottom:1px solid #eef2f7;padding:10px;vertical-align:top;background:#fff}
   tbody tr:last-child td{border-bottom:none}
 
-  /* 열 폭 — 자연스러운 줄바꿈을 위해 % 기준 + wrap */
-  col.col-teamko{width:18%}
-  col.col-teamen{width:18%}
-  col.col-pname{width:18%}
-  col.col-no{width:8%}
-  col.col-pos{width:8%}
-  col.col-birth{width:12%}
-  col.col-age{width:6%}
-  col.col-elite{width:6%}
-  col.col-attend{width:6%}
+  /* === 열 폭 재배치 (요청 반영) ===
+     - teamNameKo: 18% → 12.6% (70%)
+     - teamNameEn: 18% → 12.6% (70%)
+     - 선수이름:   18% → 10.8% (60%)
+     - 나머지 열로 18%p 재분배
+   */
+  col.col-teamko{width:12.6%}
+  col.col-teamen{width:12.6%}
+  col.col-pname{width:10.8%}
+  col.col-no{width:10%}
+  col.col-pos{width:9%}
+  col.col-birth{width:20%}
+  col.col-age{width:9%}
+  col.col-elite{width:8%}
+  col.col-attend{width:8%}
 
   td,th{word-break:keep-all; overflow-wrap:anywhere; line-height:1.35}
   .t-center{text-align:center}
@@ -62,7 +67,7 @@
   .print-only{display:none}
   .screen-only{display:initial}
 
-  /* ===== 인쇄 최적화: A4 세로 + 체크된 행만 출력 ===== */
+  /* ===== 인쇄 최적화: A4 세로 + 체크된 행만 출력 + 줄바꿈 최소화 ===== */
   @page{ size:A4 portrait; margin:12mm }
   @media print{
     body{background:#fff}
@@ -77,7 +82,10 @@
     /* 체크박스 대신 ✓ 출력 */
     .attend-box{display:none !important}
     .attend-mark{display:inline !important}
-    .page{width:100%}
+    /* 행 단위 분리 방지 */
+    tr{break-inside:avoid; page-break-inside:avoid}
+    /* 짧은 필드 줄바꿈 최소화 */
+    td.nowrap, th.nowrap{white-space:nowrap !important}
   }
 </style>
 </head>
@@ -125,12 +133,12 @@
           <th>teamNameKo</th>
           <th>teamNameEn</th>
           <th>선수이름</th>
-          <th>등번호</th>
-          <th>포지션</th>
-          <th>생년월일<br><span class="muted">(YYYY-MM-DD)</span></th>
-          <th>만나이</th>
-          <th>선출여부</th>
-          <th class="t-center">출석</th>
+          <th class="nowrap">등번호</th>
+          <th class="nowrap">포지션</th>
+          <th class="nowrap">생년월일<br><span class="muted">(YYYY-MM-DD)</span></th>
+          <th class="nowrap">만나이</th>
+          <th class="nowrap">선출여부</th>
+          <th class="nowrap t-center">출석</th>
         </tr>
       </thead>
       <tbody id="tbody">
@@ -213,20 +221,17 @@ function parseBackNoToNum(raw){
 }
 
 function normalizePlayer(p, team){
-  // 선수이름: 가능한 모든 키 대비
+  // 선수이름
   const name = pick(p, [
     'playerName','player_name','player','nameKo','name_ko','name','koreanName','korName',
     'playerNameKo','player_name_ko','선수이름','선수','성명'
   ]);
-
-  // 등번호: 가능한 모든 키 대비 (앞의 0을 유지하기 위해 문자열 그대로 사용)
+  // 등번호
   const backNoRaw = pick(p, [
     'backNumber','backNo','jersey','jerseyNo','jerseyNo_ko','uniformNo','uniform','number','no',
     'jerseyNumber','등번호'
   ]);
-
   const pos = pick(p, ['position','pos','포지션','포지션명']);
-
   const birth = pick(p, ['dob','birth','birthDate','birthday','생년월일','출생']);
   const elite = truthyFlag(p?.elite)||truthyFlag(p?.isElite)||truthyFlag(p?.pro)||truthyFlag(p?.selected)||truthyFlag(p?.선출)||truthyFlag(p?.선출여부);
 
@@ -234,7 +239,7 @@ function normalizePlayer(p, team){
     teamNameKo: team.teamNameKo||'',
     teamNameEn: team.teamNameEn||'',
     playerName: String(name||''),
-    backNumber: backNoRaw==null?'' : String(backNoRaw).trim(), // 00 보존
+    backNumber: backNoRaw==null?'' : String(backNoRaw).trim(),
     position: pos||'',
     birthYMD: fmtYMDOnly(birth),
     age: calcAge(birth),
@@ -295,12 +300,12 @@ function rowHtml(v, idx){
       <td>${v.teamNameKo||''}</td>
       <td>${v.teamNameEn||''}</td>
       <td>${v.playerName||''}</td>
-      <td class="t-center">${v.backNumber||''}</td>
-      <td class="t-center">${v.position||''}</td>
-      <td class="t-center">${v.birthYMD||''}</td>
-      <td class="t-center">${v.age||''}</td>
-      <td class="t-center">${v.elite||''}</td>
-      <td class="t-center">
+      <td class="t-center nowrap">${v.backNumber||''}</td>
+      <td class="t-center nowrap">${v.position||''}</td>
+      <td class="t-center nowrap">${v.birthYMD||''}</td>
+      <td class="t-center nowrap">${v.age||''}</td>
+      <td class="t-center nowrap">${v.elite||''}</td>
+      <td class="t-center nowrap">
         <input type="checkbox" class="attend-box" data-idx="${idx}">
         <span class="attend-mark print-only">✓</span>
       </td>
@@ -346,16 +351,16 @@ function updateSelectedCount(players){
     const rawPlayers = await fetchPlayersOfTeam(teamId);
     let players = rawPlayers.map(p=>normalizePlayer(p, team));
 
-    // ▶ 등번호 내림차순 정렬 (요청 #3)
+    // ▶ 등번호 오름차순 정렬 (요청 반영)
     players.sort((a,b)=>{
       const an = a._sortBackNum, bn = b._sortBackNum;
       if(an==null && bn==null){
-        // 둘 다 숫자가 아니면 문자열 역순
-        return String(b.backNumber||'').localeCompare(String(a.backNumber||''));
+        // 둘 다 숫자 아님 → 문자열 오름차순
+        return String(a.backNumber||'').localeCompare(String(b.backNumber||''));
       }
-      if(an==null) return 1;
+      if(an==null) return 1;   // 숫자 아님은 뒤로
       if(bn==null) return -1;
-      return bn - an; // 내림차순
+      return an - bn;          // 오름차순
     });
 
     $('#playerCount').textContent = String(players.length);
@@ -363,7 +368,7 @@ function updateSelectedCount(players){
     renderTable(players);
     updateSelectedCount(players);
 
-    // 상단 "출석 전체선택"만 유지 (요청 #2)
+    // 상단 "출석 전체선택"만 유지
     const toggleAll = (checked)=>{
       const cbs = document.querySelectorAll('.attend-box');
       cbs.forEach((cb, i)=>{
@@ -376,7 +381,7 @@ function updateSelectedCount(players){
     };
     $('#checkAll')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
 
-    // 새로고침 & 프린트/저장 (우측 배치 — 요청 #4)
+    // 새로고침 & 프린트/저장 (우측 배치 유지)
     $('#reloadBtn')?.addEventListener('click', ()=>location.reload());
     $('#printBtn')?.addEventListener('click', ()=>window.print());
 
