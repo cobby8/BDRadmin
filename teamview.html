@@ -13,17 +13,26 @@
   html,body{height:100%}
   body{margin:0;background:var(--bg);font-family:'Pretendard','Apple SD Gothic Neo',system-ui,-apple-system,sans-serif;color:var(--ink)}
   .wrap{max-width:1100px;margin:18px auto;padding:0 12px 48px}
-  header{display:flex;justify-content:space-between;align-items:center;margin:10px 0 16px}
+  header{display:flex;justify-content:space-between;align-items:center;margin:10px 0 10px}
   h1{font-size:18px;margin:0}
+  .muted{color:var(--muted);font-size:12px}
+
   .card{background:var(--card);border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:12px}
-  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .btn{padding:9px 12px;border-radius:12px;border:1px solid #dfe6ee;background:#fff;cursor:pointer;white-space:nowrap}
   .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .muted{color:var(--muted);font-size:12px}
+
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 10px}
+  .team-head{display:flex;flex-direction:column;gap:4px}
+  .team-names{font-size:16px;font-weight:700}
+  .team-names .en{font-weight:600;color:#64748b}
+  .stat{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .badge{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:#334155;background:#f1f5fb;border:1px solid #e4ecf7;border-radius:999px;padding:4px 8px}
+  .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:8px 12px;background:#fff;font-size:13px}
   .count{font-weight:700}
 
-  /* ===== 표 ===== */
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end; margin-left:auto}
+  .actions .btn{height:36px}
+
   .table-wrap{overflow:auto;background:#fff;border-radius:14px;box-shadow:0 8px 28px rgba(23,105,255,.08);padding:10px}
   table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #e6ecf5;border-radius:12px;table-layout:fixed}
   thead th{position:sticky;top:0;background:#f8fbff;color:#475569;font-size:12px;text-align:left;border-bottom:1px solid #e6ecf5;padding:10px;z-index:1}
@@ -46,16 +55,6 @@
   .t-right{text-align:right}
   .nowrap{white-space:nowrap}
 
-  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 10px}
-  .team-head{display:flex;flex-direction:column;gap:4px}
-  .team-names{font-size:16px;font-weight:700}
-  .team-names .en{font-weight:600;color:#64748b}
-  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-
-  .stat{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .stat .sep{width:1px;height:14px;background:#e6ecf5}
-  .pill{display:inline-flex;gap:6px;align-items:center;border:1px solid #e6ecf5;border-radius:999px;padding:6px 10px;background:#fff;font-size:12px}
-
   /* 출석 체크 상태에 따라 행 강조(화면에서만) */
   tbody tr.attend-checked{background:linear-gradient(0deg, rgba(22,163,74,.06), rgba(22,163,74,.06))}
   tbody tr.attend-checked td{border-bottom-color:#d1fae5}
@@ -63,7 +62,7 @@
   .print-only{display:none}
   .screen-only{display:initial}
 
-  /* ===== 인쇄 최적화 (요구 0,4) ===== */
+  /* ===== 인쇄 최적화: A4 세로 + 체크된 행만 출력 ===== */
   @page{ size:A4 portrait; margin:12mm }
   @media print{
     body{background:#fff}
@@ -76,22 +75,17 @@
     /* 출석 체크되지 않은 행은 인쇄에서 제외 */
     tbody tr:not(.attend-checked){display:none}
     /* 체크박스 대신 ✓ 출력 */
-    .attend-box{display:none}
-    .attend-mark{display:inline}
-    /* 페이지 폭 맞춤 */
+    .attend-box{display:none !important}
+    .attend-mark{display:inline !important}
     .page{width:100%}
   }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="screen-only">
+  <header>
     <h1>TeamView</h1>
-    <div class="toolbar">
-      <span class="muted" id="healthDot" title="연결상태">●</span>
-      <button class="btn" id="reloadBtn">새로고침</button>
-      <button class="btn primary" id="printBtn">프린트/저장</button>
-    </div>
+    <span class="muted screen-only" id="healthDot" title="연결상태">●</span>
   </header>
 
   <!-- 상단 정보/액션 -->
@@ -103,13 +97,18 @@
       </div>
       <div class="stat">
         <span class="badge">팀 ID: <span id="teamIdBadge">-</span></span>
-        <span class="sep"></span>
         <span class="pill">선수 <b class="count" id="playerCount">0</b>명</span>
         <span class="pill">출석 선택 <b class="count" id="selectedCount">0</b>명</span>
       </div>
     </div>
+
+    <!-- 우측 액션: 출석 전체선택 + 새로고침 + 프린트/저장 -->
     <div class="actions screen-only">
-      <label class="pill"><input type="checkbox" id="checkAll" /> &nbsp;출석 전체선택</label>
+      <label class="pill" title="목록 전체 선택/해제">
+        <input type="checkbox" id="checkAll" />&nbsp;출석 전체선택
+      </label>
+      <button class="btn" id="reloadBtn">새로고침</button>
+      <button class="btn primary" id="printBtn">프린트/저장</button>
     </div>
   </div>
 
@@ -131,12 +130,7 @@
           <th>생년월일<br><span class="muted">(YYYY-MM-DD)</span></th>
           <th>만나이</th>
           <th>선출여부</th>
-          <th class="t-center">
-            출석
-            <div class="muted screen-only" style="font-weight:600;margin-top:4px">
-              <label><input type="checkbox" id="checkAllHead"> 전체선택</label>
-            </div>
-          </th>
+          <th class="t-center">출석</th>
         </tr>
       </thead>
       <tbody id="tbody">
@@ -165,7 +159,7 @@ const $=s=>document.querySelector(s);
 const pad=n=>String(n).padStart(2,'0');
 function apiUrl(path,q={}){ const u=new URL(WEB_APP_URL); u.searchParams.set('path', path); Object.entries(q||{}).forEach(([k,v])=>u.searchParams.set(k,v)); return u.toString(); }
 async function getJSON(u){ const r=await fetch(u,{cache:'no-store',mode:'cors'}); const t=await r.text(); try{ return JSON.parse(t); }catch{ throw new Error('JSON 파싱 실패'); } }
-const truthyFlag=(v)=>{ if (v===true||v===1) return true; if(typeof v==='string'){ const s=v.trim().toLowerCase(); if(['true','ok','success','done','1','yes','y','o','on','t','확인','예','선출','유','O'].includes(s)) return true; } return false; };
+const truthyFlag=(v)=>{ if (v===true||v===1) return true; if(typeof v==='string'){ const s=v.trim().toLowerCase(); if(['true','ok','success','done','1','yes','y','o','on','t','확인','예','선출','유','o','O'].includes(s)) return true; } return false; };
 
 function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name)||''; }
 
@@ -175,7 +169,6 @@ function parseDateLoose(v){
   if(v instanceof Date && !isNaN(v)) return v;
   if(typeof v==='number'){ const d=new Date(v); return isNaN(d)?null:d; }
   const s=String(v).trim();
-  // YYYYMMDD
   const digits=s.replace(/\D/g,'');
   if(digits.length===8){
     const y=+digits.slice(0,4), m=+digits.slice(4,6)-1, d=+digits.slice(6,8);
@@ -186,11 +179,7 @@ function parseDateLoose(v){
   if(!isNaN(d)) return d;
   return null;
 }
-function fmtYMDOnly(v){
-  const d=parseDateLoose(v);
-  if(!d) return '';
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
+function fmtYMDOnly(v){ const d=parseDateLoose(v); if(!d) return ''; return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function calcAge(dob, asOf){
   const b=parseDateLoose(dob); if(!b) return '';
   const ref=asOf?parseDateLoose(asOf):new Date();
@@ -209,27 +198,49 @@ function pick(o, keys=[], fallback=''){
 function normalizeTeam(t){
   if(!t) return {teamId:'', teamNameKo:'', teamNameEn:''};
   const teamId = pick(t, ['teamId','TeamID','id','Id']);
-  const teamNameKo = pick(t, ['teamNameKo','teamName','nameKo','name','team_name_ko']);
-  const teamNameEn = pick(t, ['teamNameEn','nameEn','team_name_en','engName','englishName']);
+  const teamNameKo = pick(t, ['teamNameKo','teamName','nameKo','name','team_name_ko','team_name','팀명','팀명한글']);
+  const teamNameEn = pick(t, ['teamNameEn','nameEn','team_name_en','engName','englishName','팀명영문']);
   const tourId = pick(t, ['tourId','TourID','tournamentId']);
   return { teamId, teamNameKo, teamNameEn, tourId, raw:t };
 }
+
+/* 숫자 등번호 파싱(정렬용) */
+function parseBackNoToNum(raw){
+  const s = String(raw ?? '').trim();
+  if(!s) return null;
+  if(/^\d+$/.test(s)) return parseInt(s,10);
+  return null;
+}
+
 function normalizePlayer(p, team){
-  const name = pick(p, ['playerName','nameKo','name','koreanName','korName','player_name']);
-  const backNo = pick(p, ['backNumber','jersey','uniformNo','number','no','jerseyNo']);
-  const pos = pick(p, ['position','pos','포지션']);
-  const birth = pick(p, ['dob','birth','birthDate','birthday','생년월일']);
+  // 선수이름: 가능한 모든 키 대비
+  const name = pick(p, [
+    'playerName','player_name','player','nameKo','name_ko','name','koreanName','korName',
+    'playerNameKo','player_name_ko','선수이름','선수','성명'
+  ]);
+
+  // 등번호: 가능한 모든 키 대비 (앞의 0을 유지하기 위해 문자열 그대로 사용)
+  const backNoRaw = pick(p, [
+    'backNumber','backNo','jersey','jerseyNo','jerseyNo_ko','uniformNo','uniform','number','no',
+    'jerseyNumber','등번호'
+  ]);
+
+  const pos = pick(p, ['position','pos','포지션','포지션명']);
+
+  const birth = pick(p, ['dob','birth','birthDate','birthday','생년월일','출생']);
   const elite = truthyFlag(p?.elite)||truthyFlag(p?.isElite)||truthyFlag(p?.pro)||truthyFlag(p?.selected)||truthyFlag(p?.선출)||truthyFlag(p?.선출여부);
+
   return {
     teamNameKo: team.teamNameKo||'',
     teamNameEn: team.teamNameEn||'',
-    playerName: name||'',
-    backNumber: (backNo==null||backNo==='')?'' : String(backNo).replace(/^0+(?=\d)/,''),
+    playerName: String(name||''),
+    backNumber: backNoRaw==null?'' : String(backNoRaw).trim(), // 00 보존
     position: pos||'',
     birthYMD: fmtYMDOnly(birth),
     age: calcAge(birth),
     elite: elite?'O':'',
     attend: false,
+    _sortBackNum: parseBackNoToNum(backNoRaw), // 정렬용 숫자
     _raw: p
   };
 }
@@ -245,7 +256,6 @@ async function health(){
 }
 
 async function fetchTeamById(teamId){
-  // 1) 직접 팀 단건
   const tryPaths = ['team','getteam','Team'];
   for(const p of tryPaths){
     try{
@@ -254,7 +264,6 @@ async function fetchTeamById(teamId){
       if(cand) return normalizeTeam(cand);
     }catch{}
   }
-  // 2) 목록에서 필터
   try{
     const j=await getJSON(apiUrl('teams'));
     const rows=Array.isArray(j?.rows)?j.rows:[];
@@ -335,13 +344,26 @@ function updateSelectedCount(players){
     $('#teamNameEn').textContent = team.teamNameEn || '';
 
     const rawPlayers = await fetchPlayersOfTeam(teamId);
-    const players = rawPlayers.map(p=>normalizePlayer(p, team));
+    let players = rawPlayers.map(p=>normalizePlayer(p, team));
+
+    // ▶ 등번호 내림차순 정렬 (요청 #3)
+    players.sort((a,b)=>{
+      const an = a._sortBackNum, bn = b._sortBackNum;
+      if(an==null && bn==null){
+        // 둘 다 숫자가 아니면 문자열 역순
+        return String(b.backNumber||'').localeCompare(String(a.backNumber||''));
+      }
+      if(an==null) return 1;
+      if(bn==null) return -1;
+      return bn - an; // 내림차순
+    });
+
     $('#playerCount').textContent = String(players.length);
 
     renderTable(players);
     updateSelectedCount(players);
 
-    // 전체선택(상단/헤더) — 둘 다 같은 기능
+    // 상단 "출석 전체선택"만 유지 (요청 #2)
     const toggleAll = (checked)=>{
       const cbs = document.querySelectorAll('.attend-box');
       cbs.forEach((cb, i)=>{
@@ -353,15 +375,10 @@ function updateSelectedCount(players){
       updateSelectedCount(players);
     };
     $('#checkAll')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
-    $('#checkAllHead')?.addEventListener('change', e=>toggleAll(!!e.target.checked));
 
-    // 새로고침
+    // 새로고침 & 프린트/저장 (우측 배치 — 요청 #4)
     $('#reloadBtn')?.addEventListener('click', ()=>location.reload());
-
-    // 인쇄
-    $('#printBtn')?.addEventListener('click', ()=>{
-      window.print();
-    });
+    $('#printBtn')?.addEventListener('click', ()=>window.print());
 
   }catch(e){
     $('#teamNameKo').textContent='로드 실패';
